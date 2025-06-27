@@ -1,0 +1,14 @@
+{
+  "name": "rosebud-game",
+  "version": "1.0.0",
+  "description": "A pixel art survival game built with Three.js",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx http-server -c-1 -p 3000",
+    "dev": "npx http-server -c-1 -p 3000"
+  },
+  "keywords": ["game", "pixel-art", "three.js", "survival"],
+  "author": "",
+  "license": "MIT",
+  "type": "module"
+}
