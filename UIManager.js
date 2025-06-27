@@ -12,6 +12,7 @@ export class UIManager {
         this.playerDot = null;
         this.castleIcon = null; // Add a property for the castle icon
         this.monsterDots = [];
+        this.npcDots = [];
         this.levelDisplay = null;
         this.xpBarFill = null;
         this.levelUpContainer = null;
@@ -33,6 +34,12 @@ export class UIManager {
         this.pauseMenuOverlay = null;
         this.bestiaryOverlay = null;
         this.biomeSelectOverlay = null;
+        this.activeQuestDisplay = null;
+        this.buffContainer = document.getElementById('buff-container');
+        this.activeQuestContainer = document.getElementById('active-quest-container');
+        this.dialogueContainer = document.getElementById('dialogue-container');
+        this.minimapContainer = document.getElementById('minimap-container');
+        this.minimap = document.getElementById('minimap');
         this.initUI();
     }
     initUI() {
@@ -98,6 +105,11 @@ export class UIManager {
             .monster-dot {
                 position: absolute; width: 6px; height: 6px; background-color: #f44336;
                  border-radius: 50%; border: 1px solid white; transition: transform 0.1s linear;
+             }
+             .npc-dot {
+                position: absolute; width: 5px; height: 5px; background-color: #00BFFF;
+                border-radius: 50%; border: 1px solid white; z-index: 5;
+                box-shadow: 0 0 3px #00BFFF;
              }
              #interaction-prompt {
                  position: absolute; bottom: 25%; left: 50%; transform: translateX(-50%);
@@ -336,29 +348,43 @@ export class UIManager {
         uiOverlay.appendChild(bottomLeftContainer);
         // --- Top-Center HUD (Wave & Biome) ---
         const topCenterContainer = document.createElement('div');
-        topCenterContainer.className = 'hud-top-center hud-container';
-        this.waveDisplay = document.createElement('div');
-        this.waveDisplay.id = 'waveDisplay';
-        this.waveDisplay.style.marginBottom = '4px';
+        topCenterContainer.className = 'hud-container hud-top-center';
+
         this.biomeDisplay = document.createElement('div');
         this.biomeDisplay.id = 'biomeDisplay';
-        this.biomeDisplay.style.fontSize = '0.7em';
-        this.biomeDisplay.style.textTransform = 'capitalize';
-        this.biomeDisplay.style.color = '#cccccc';
-        topCenterContainer.append(this.waveDisplay, this.biomeDisplay);
-        uiOverlay.appendChild(topCenterContainer);
-        // --- Top-Right HUD (Score) ---
-        this.scoreDisplay = document.createElement('div');
-        this.scoreDisplay.id = 'scoreDisplay';
-        this.scoreDisplay.className = 'hud-top-right hud-container';
-        uiOverlay.appendChild(this.scoreDisplay);
-        
-        // --- Weapon Display (below score) ---
+        this.biomeDisplay.textContent = 'Green Hills';
+
+        topCenterContainer.appendChild(this.biomeDisplay);
+
+        // --- Top-Right HUD (Active Quest Display) ---
+        const topRightContainer = document.createElement('div');
+        topRightContainer.className = 'hud-container hud-top-right';
+        topRightContainer.style.cssText += 'min-width: 200px; max-width: 300px;';
+
+        const questTitle = document.createElement('div');
+        questTitle.textContent = 'Active Quest';
+        questTitle.style.cssText = 'color: #ffeb3b; font-size: 0.6em; margin-bottom: 5px; text-align: center;';
+
+        this.activeQuestDisplay = document.createElement('div');
+        this.activeQuestDisplay.id = 'activeQuestDisplay';
+        this.activeQuestDisplay.style.cssText = 'color: #fff; font-size: 0.5em; line-height: 1.4; text-align: left;';
+        this.activeQuestDisplay.innerHTML = '<div style="color: #aaa;">No active quests</div>';
+
+        topRightContainer.appendChild(questTitle);
+        topRightContainer.appendChild(this.activeQuestDisplay);
+
+        // --- Weapon Display (below quest) ---
         this.weaponDisplay = document.createElement('div');
-        this.weaponDisplay.className = 'hud-top-right hud-container';
-        this.weaponDisplay.style.top = '80px';
+        this.weaponDisplay.className = 'hud-container hud-top-right';
+        this.weaponDisplay.style.top = '120px';
         this.weaponDisplay.style.fontSize = '0.8em';
+        this.weaponDisplay.innerHTML = "<span class='pixel-weapon-sword'></span> SWORD";
+        
+        // Add center and right containers to overlay
+        uiOverlay.appendChild(topCenterContainer);
+        uiOverlay.appendChild(topRightContainer);
         uiOverlay.appendChild(this.weaponDisplay);
+        
         // --- Bottom-Right HUD (Minimap) ---
         const bottomRightContainer = document.createElement('div');
         bottomRightContainer.className = 'hud-bottom-right';
@@ -425,15 +451,22 @@ export class UIManager {
         item.innerHTML = `${icon} <span>...</span>`;
         return item;
     }
-    updateBuffs(buffs) {
-        if (this.buffContainer) {
-            this.buffContainer.innerHTML = '';
-            Object.entries(buffs).forEach(([buff, timer]) => {
-                const buffDiv = document.createElement('div');
-                buffDiv.className = 'buff-icon';
-                buffDiv.innerHTML = `<span class='pixel-buff-${buff}'></span><span class='buff-timer'>${timer.toFixed(1)}s</span>`;
-                this.buffContainer.appendChild(buffDiv);
-            });
+    updateBuffs(activeBuffs) {
+        if (!this.buffContainer) return;
+        this.buffContainer.innerHTML = '';
+        for (const buffId in activeBuffs) {
+            const buff = activeBuffs[buffId];
+            const buffElement = document.createElement('div');
+            buffElement.className = 'buff-icon';
+            buffElement.innerHTML = `
+                ${buff.icon}
+                <div class="buff-tooltip">
+                    <strong>${buff.name}</strong><br>
+                    ${buff.description}<br>
+                    Time Left: ${buff.timeLeft.toFixed(1)}s
+                </div>
+            `;
+            this.buffContainer.appendChild(buffElement);
         }
     }
     updatePlayerHealth(currentHealth, maxHealth) {
@@ -475,9 +508,14 @@ export class UIManager {
                 void this.scoreDisplay.offsetWidth;
                 this.scoreDisplay.classList.add('score-pop');
             }
-            this.scoreDisplay.textContent = `Score: ${score}`;
+            this.scoreDisplay.textContent = `Gold: ${score}`;
             this.lastScore = score;
         }
+    }
+
+    updateGold(gold) {
+        // Alias for updateScore since gold is now the currency
+        this.updateScore(gold);
     }
     updateWeapon(weapon, stance) {
         if (this.weaponDisplay) {
@@ -490,9 +528,10 @@ export class UIManager {
             this.weaponDisplay.innerHTML = `${weaponIcons[weapon] || '<span class=\'pixel-weapon-sword\'></span>'} ${weapon.toUpperCase()}${stanceText}`;
         }
     }
-    updateWave(wave) {
+    updateWave(wave, explorationMode = false) {
         if (this.waveDisplay) {
-            this.waveDisplay.textContent = `Wave: ${wave}`;
+            // Always hide wave display in exploration mode
+            this.waveDisplay.style.display = 'none';
         }
     }
     updateBiome(biomeName) {
@@ -500,7 +539,37 @@ export class UIManager {
             this.biomeDisplay.textContent = biomeName;
         }
     }
-    updateMinimap(playerPosition, worldSize, castlePosition, monsterPositions = []) {
+    updateActiveQuest(quest) {
+        if (this.activeQuestDisplay) {
+            if (!quest) {
+                this.activeQuestDisplay.innerHTML = '<div style="color: #aaa;">No active quests</div>';
+            } else {
+                let questHTML = `
+                    <div style="color: #ffeb3b; font-weight: bold; margin-bottom: 3px;">${quest.title}</div>
+                    <div style="color: #ddd; font-size: 0.45em; margin-bottom: 8px;">${quest.description}</div>
+                `;
+                
+                if (quest.objectives && quest.objectives.length > 0) {
+                    questHTML += '<div style="color: #ff9800; font-size: 0.45em; margin-bottom: 3px;">Objectives:</div>';
+                    quest.objectives.forEach(obj => {
+                        const status = obj.completed ? '✓' : '○';
+                        const color = obj.completed ? '#4caf50' : '#fff';
+                        let objText = obj.description;
+                        
+                        // Show progress if objective has current/target values
+                        if (obj.current !== undefined && obj.target !== undefined) {
+                            objText += ` (${obj.current}/${obj.target})`;
+                        }
+                        
+                        questHTML += `<div style="color: ${color}; font-size: 0.4em; margin-left: 8px;">${status} ${objText}</div>`;
+                    });
+                }
+                
+                this.activeQuestDisplay.innerHTML = questHTML;
+            }
+        }
+    }
+    updateMinimap(playerPosition, worldSize, castlePosition, monsterPositions = [], npcPositions = []) {
         if (!this.minimapContainer) return;
         const mapWidth = this.minimapContainer.clientWidth;
         const mapHeight = this.minimapContainer.clientHeight;
@@ -520,6 +589,31 @@ export class UIManager {
             const iconX = cPercentX * mapWidth - (this.castleIcon.offsetWidth / 2);
             const iconY = cPercentZ * mapHeight - (this.castleIcon.offsetHeight / 2);
             this.castleIcon.style.transform = `translate(${iconX}px, ${iconY}px)`;
+        }
+        
+        // Update NPC dots
+        for (let i = 0; i < npcPositions.length; i++) {
+            if (i >= this.npcDots.length) {
+                // Create new NPC dot if we don't have enough
+                const newNpcDot = document.createElement('div');
+                newNpcDot.className = 'npc-dot';
+                newNpcDot.title = 'NPC'; // Tooltip
+                this.minimapContainer.appendChild(newNpcDot);
+                this.npcDots.push(newNpcDot);
+            }
+            const dot = this.npcDots[i];
+            const pos = npcPositions[i];
+            
+            dot.style.display = 'block';
+            const npcPercentX = (pos.x + worldSize / 2) / worldSize;
+            const npcPercentZ = (pos.z + worldSize / 2) / worldSize;
+            const dotX = npcPercentX * mapWidth - (dot.offsetWidth / 2);
+            const dotY = npcPercentZ * mapHeight - (dot.offsetHeight / 2);
+            dot.style.transform = `translate(${dotX}px, ${dotY}px)`;
+        }
+        // Hide unused NPC dots
+        for (let i = npcPositions.length; i < this.npcDots.length; i++) {
+            this.npcDots[i].style.display = 'none';
         }
         
         // Update monster dots
@@ -639,6 +733,16 @@ export class UIManager {
             this.levelUpContainer = null;
         }
     }
+    toggleMinimap() {
+        if (this.minimapContainer) {
+            const isVisible = this.minimapContainer.style.display !== 'none';
+            this.minimapContainer.style.display = isVisible ? 'none' : 'block';
+            console.log(`🗺️ Minimap toggled: ${isVisible ? 'hidden' : 'visible'}`);
+        } else {
+            console.warn('❌ Minimap container not found');
+        }
+    }
+
     dispose() {
         this.hideLevelUpUI(); // Make sure level up UI is removed
         this.hideInteractionPrompt();
@@ -683,7 +787,7 @@ export class UIManager {
         const instructions = document.createElement('p');
         instructions.innerHTML = `
             CONTROLS:<br>
-            WASD or ARROW KEYS to MOVE<br>
+                            ARROW KEYS to MOVE<br>
             SPACEBAR to ATTACK<br>
             1, 2, 3 to SWITCH WEAPONS<br>
             SHIFT to BLOCK<br>
@@ -822,8 +926,13 @@ export class UIManager {
         const monsters = [
             { icon: '👹', name: 'Green Ogre', desc: 'A slow but tough brute.' },
             { icon: '💀', name: 'Red Skull', desc: 'Fast and deadly, beware its charge.' },
-            { icon: '👁️', name: 'Cyclops', desc: 'Big, strong, and can stun.' },
-            { icon: '✨', name: 'Magic Wisp', desc: 'Floats and shoots magic bolts.' }
+            { icon: '👁️', name: 'Cyclops', desc: 'A giant one-eyed brute that throws rocks.' },
+            { icon: '✨', name: 'Magic Wisp', desc: 'Floats about and fires homing energy.' },
+            { icon: '🦂', name: 'Desert Scorpion', desc: 'Fast desert predator with a venom sting.' },
+            { icon: '🐺', name: 'Frost Wolf', desc: 'Pack hunter that chills with icy breath.' },
+            { icon: '🪨', name: 'Volcanic Golem', desc: 'Lava-infused juggernaut, very tough.' },
+            { icon: '❄️', name: 'Ice Elemental', desc: 'Shoots shards of ice from afar.' },
+            { icon: '🌳', name: 'Magic Treant', desc: 'Enchanted tree that crushes intruders.' }
         ];
         this.bestiaryOverlay.innerHTML = `
             <div class='bestiary-panel'>
@@ -833,7 +942,7 @@ export class UIManager {
                 </div>
                 <div style='margin-top:24px; font-size:1.2em;'>FAQ</div>
                 <div style='font-size:0.8em; margin-top:8px; text-align:left;'>
-                    <b>Q:</b> How do I move?<br><b>A:</b> Use WASD or arrow keys.<br><br>
+                    <b>Q:</b> How do I move?<br><b>A:</b> Use arrow keys only (compatible with all keyboard layouts).<br><br>
                     <b>Q:</b> How do I attack?<br><b>A:</b> Press Space.<br><br>
                     <b>Q:</b> How do I switch weapons?<br><b>A:</b> 1 = Sword, 2 = Bow, 3 = Staff.<br><br>
                     <b>Q:</b> What are buffs?<br><b>A:</b> Buffs are temporary power-ups from shrines.<br>
@@ -949,5 +1058,88 @@ export class UIManager {
             this.uiOverlay.style.visibility = 'visible';
             console.log("uiOverlay shown");
         }
+    }
+    showBuffSelectionUI(availableBuffs, onSelectCallback) {
+        // Create buff selection overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'level-up-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        `;
+        
+        const panel = document.createElement('div');
+        panel.style.cssText = `
+            background: #2a2a2a;
+            border: 3px solid #8b4513;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            max-width: 500px;
+            color: #fff;
+        `;
+        
+        const title = document.createElement('h2');
+        title.textContent = 'Choose Your Blessing';
+        title.style.cssText = `
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+        `;
+        panel.appendChild(title);
+        
+        availableBuffs.forEach((buff, index) => {
+            const buffButton = document.createElement('button');
+            buffButton.style.cssText = `
+                display: block;
+                width: 100%;
+                margin: 10px 0;
+                padding: 15px;
+                background: #3a3a3a;
+                border: 2px solid #666;
+                border-radius: 5px;
+                color: #fff;
+                cursor: pointer;
+                font-family: 'Courier New', monospace;
+                transition: all 0.2s;
+            `;
+            
+            buffButton.innerHTML = `
+                <div style="font-size: 18px; margin-bottom: 5px;">
+                    ${buff.icon} ${buff.name}
+                </div>
+                <div style="font-size: 12px; color: #ccc;">
+                    ${buff.description}
+                </div>
+            `;
+            
+            buffButton.addEventListener('mouseenter', () => {
+                buffButton.style.background = '#4a4a4a';
+                buffButton.style.borderColor = '#8b4513';
+            });
+            
+            buffButton.addEventListener('mouseleave', () => {
+                buffButton.style.background = '#3a3a3a';
+                buffButton.style.borderColor = '#666';
+            });
+            
+            buffButton.addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                onSelectCallback(buff);
+            });
+            
+            panel.appendChild(buffButton);
+        });
+        
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
     }
 }

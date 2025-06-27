@@ -1,120 +1,187 @@
 // Simple Web Audio API manager
 export class AudioManager {
     constructor() {
-        // Create AudioContext on first user interaction (or lazily)
         this.audioContext = null;
         this.sounds = {};
         this.musicTracks = {};
-        this.currentMusicSource = null; // To control the currently playing music
-        this.musicTimeoutId = null; // Store timeout ID to manage loops
+        this.currentMusicSource = null;
+        this.musicTimeoutId = null;
         this.isInitialized = false;
-        this.musicQueuedToPlay = false; // Flag to play music after user interaction
-        // Attempt to initialize immediately, might require user gesture later
-        this.tryInitialize();
+        this.musicEnabled = false;
+        this.userHasInteracted = false;
+        
+        // Bind and setup user interaction detection
+        this.handleUserInteraction = this.handleUserInteraction.bind(this);
+        this.setupUserInteractionListeners();
+        
+        console.log("🎵 AudioManager created - waiting for user interaction");
     }
 
-    tryInitialize() {
-        if (this.isInitialized) return;
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (this.audioContext.state === 'suspended') {
-                 console.log("AudioContext suspended, needs user gesture to resume.");
-                 // Add a listener to resume on first interaction (e.g., click)
-                 const resumeAudio = () => {
-                    if(this.audioContext && this.audioContext.state === 'suspended') {
-                        this.audioContext.resume().then(() => {
-                            console.log("AudioContext resumed successfully.");
-                            this.preloadSounds(); // Load sounds after resuming
-                            // If music was supposed to play, start it now
-                            if (this.musicQueuedToPlay) {
-                                this.musicQueuedToPlay = false; // Reset flag
-                                this.playMusic();
-                            }
-                            window.removeEventListener('click', resumeAudio);
-                            window.removeEventListener('keydown', resumeAudio);
-                        });
-                    }
-                 };
-                 window.addEventListener('click', resumeAudio, { once: true });
-                 window.addEventListener('keydown', resumeAudio, { once: true });
-            } else {
-                this.preloadSounds();
+    setupUserInteractionListeners() {
+        // Listen for any user interaction to enable audio
+        const events = ['click', 'keydown', 'touchstart', 'mousedown'];
+        events.forEach(event => {
+            document.addEventListener(event, this.handleUserInteraction, { once: false });
+        });
+    }
+    
+    async handleUserInteraction() {
+        if (this.userHasInteracted) return;
+        
+        console.log("🎵 User interaction detected - enabling audio");
+        this.userHasInteracted = true;
+        
+        // Remove event listeners
+        const events = ['click', 'keydown', 'touchstart', 'mousedown'];
+        events.forEach(event => {
+            document.removeEventListener(event, this.handleUserInteraction);
+        });
+        
+        // Initialize audio system
+        if (!this.isInitialized) {
+            const success = await this.initialize();
+            if (success) {
+                console.log("🎵 Audio initialized successfully");
+                this.startMusic();
             }
-        } catch (e) {
-            console.error("Web Audio API is not supported in this browser.", e);
+        }
+    }
+
+    async initialize() {
+        if (this.isInitialized) return true;
+        
+        try {
+            console.log("🎵 Initializing AudioContext...");
+            
+            // Create AudioContext
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Resume if suspended
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            
+            console.log("🎵 AudioContext state:", this.audioContext.state);
+            
+            if (this.audioContext.state === 'running') {
+                this.preloadSounds();
+                this.isInitialized = true;
+                this.musicEnabled = true;
+                console.log("🎵 Audio system fully initialized!");
+                return true;
+            } else {
+                console.warn("🎵 AudioContext not running:", this.audioContext.state);
+                return false;
+            }
+        } catch (error) {
+            console.error("🎵 Failed to initialize audio:", error);
+            return false;
         }
     }
 
     preloadSounds() {
-         if (!this.audioContext) return;
-        console.log("Preloading sounds...");
+        if (!this.audioContext) return;
+        
+        console.log("🎵 Preloading sounds...");
+        
         // Generate simple sounds programmatically
-        this.sounds['playerAttack'] = this.createSynthSound(440, 0.05, 'square', 0.5); // Short 'pew'
-        this.sounds['monsterHit'] = this.createNoiseSound(0.15, 0.2); // Short noise burst
-        this.sounds['playerHit'] = this.createNoiseSound(0.25, 0.4); // Longer, slightly harsher noise
-        this.sounds['levelUp'] = this.createSynthSound(523.25, 0.5, 'triangle', 0.6); // Upward 'ding'
-        // Define music tracks
+        this.sounds['playerAttack'] = this.createSynthSound(440, 0.05, 'square', 0.5);
+        this.sounds['monsterHit'] = this.createNoiseSound(0.15, 0.2);
+        this.sounds['playerHit'] = this.createNoiseSound(0.25, 0.4);
+        this.sounds['levelUp'] = this.createSynthSound(523.25, 0.5, 'triangle', 0.6);
+        
+        // Create music tracks
         this.createMusicTrack('overworld', 120, [
-            // A Section (calm, establishing)
+            // Main Theme A (peaceful village)
             { note: 'C4', duration: 0.5 }, { note: 'E4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 0.5 },
             { note: 'D4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
             { note: 'C4', duration: 0.5 }, { note: 'E4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
             { note: 'G4', duration: 0.25 }, { note: 'A4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'F4', duration: 0.25 }, { note: 'E4', duration: 0.5 }, { note: 'C4', duration: 0.5 },
-            // B Section (brighter, more movement)
+            // Theme B (wandering/exploration)
             { note: 'A4', duration: 0.5 }, { note: 'C5', duration: 0.5 }, { note: 'B4', duration: 0.5 }, { note: 'A4', duration: 0.5 },
             { note: 'G4', duration: 0.5 }, { note: 'B4', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'G4', duration: 0.5 },
             { note: 'F4', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 0.5 },
             { note: 'D4', duration: 1.0 }, { note: 'G4', duration: 1.0 },
-             // A Section Variation (return to theme with more flair)
-            { note: 'C4', duration: 0.5 }, { note: 'E4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 0.5 },
-            { note: 'D4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
-            { note: 'C4', duration: 0.25 }, { note: 'D4', duration: 0.25 }, { note: 'E4', duration: 0.25 }, { note: 'F4', duration: 0.25 }, { note: 'G4', duration: 1.0 },
-            { note: 'G4', duration: 0.25 }, { note: 'A4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'F4', duration: 0.25 }, { note: 'E4', duration: 1.0 },
+            // Theme C (heroic variation with harmonies)
+            { note: 'C5', duration: 0.25 }, { note: 'B4', duration: 0.25 }, { note: 'A4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'G4', duration: 0.5 },
+            { note: 'E5', duration: 0.25 }, { note: 'D5', duration: 0.25 }, { note: 'C5', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'B4', duration: 0.5 },
+            { note: 'C5', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 0.5 }, { note: 'C4', duration: 0.5 },
+            { note: 'D4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
+            // Extended Bridge (mysterious transition)
+            { note: 'A3', duration: 1.0 }, { note: 'C4', duration: 0.5 }, { note: 'E4', duration: 0.5 },
+            { note: 'G4', duration: 0.75 }, { note: 'F4', duration: 0.25 }, { note: 'E4', duration: 0.5 }, { note: 'D4', duration: 0.5 },
+            { note: 'C4', duration: 1.0 }, { note: 'G3', duration: 0.5 }, { note: 'A3', duration: 0.5 },
+            { note: 'B3', duration: 0.5 }, { note: 'D4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
+            // Theme A Return (more ornate)
+            { note: 'C4', duration: 0.25 }, { note: 'D4', duration: 0.25 }, { note: 'E4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 0.5 },
+            { note: 'D4', duration: 0.25 }, { note: 'E4', duration: 0.25 }, { note: 'F4', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
+            { note: 'C4', duration: 0.25 }, { note: 'E4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'C5', duration: 0.25 }, { note: 'B4', duration: 0.5 }, { note: 'A4', duration: 0.5 },
+            { note: 'G4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'E4', duration: 1.0 }, { note: 'C4', duration: 1.0 },
         ]);
+        
         this.createMusicTrack('adventure', 140, [
-             // Intro
+            // Epic Intro
             { note: 'G3', duration: 0.5 }, { note: 'C4', duration: 0.5 }, { note: 'D4', duration: 0.5 }, { note: 'D#4', duration: 0.5 },
-            // Verse 1
+            { note: 'F4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'A#4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
+            // Main Adventure Theme
             { note: 'G4', duration: 0.25 }, { note: 'A#4', duration: 0.25 }, { note: 'C5', duration: 0.5 }, { note: 'G4', duration: 0.5 },
             { note: 'D#4', duration: 0.25 }, { note: 'F4', duration: 0.25 }, { note: 'G4', duration: 0.5 }, { note: 'D#4', duration: 0.5 },
-            // Chorus (dramatic)
+            { note: 'A#4', duration: 0.25 }, { note: 'C5', duration: 0.25 }, { note: 'D5', duration: 0.5 }, { note: 'A#4', duration: 0.5 },
+            { note: 'F4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'A#4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
+            // Dramatic Chorus
             { note: 'C5', duration: 0.5 }, { note: 'D5', duration: 0.25 }, { note: 'D#5', duration: 0.75 },
             { note: 'A#4', duration: 0.5 }, { note: 'C5', duration: 0.25 }, { note: 'D5', duration: 0.75 },
-            // Bridge
-            { note: 'F4', duration: 1.0 }, { note: 'G#4', duration: 1.0 },
-            { note: 'G4', duration: 1.0 }, { note: 'A#4', duration: 1.0 },
-            // Outro
-            { note: 'C5', duration: 0.5 }, { note: 'A#4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
+            { note: 'F5', duration: 0.5 }, { note: 'D#5', duration: 0.5 }, { note: 'D5', duration: 0.5 }, { note: 'C5', duration: 0.5 },
+            { note: 'A#4', duration: 1.0 }, { note: 'G4', duration: 1.0 },
+            // Battle Bridge (intense)
+            { note: 'D5', duration: 0.25 }, { note: 'C5', duration: 0.25 }, { note: 'A#4', duration: 0.25 }, { note: 'A4', duration: 0.25 }, { note: 'G4', duration: 0.5 },
+            { note: 'F4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'A#4', duration: 0.25 }, { note: 'C5', duration: 0.25 }, { note: 'D5', duration: 0.5 },
+            { note: 'D#5', duration: 0.5 }, { note: 'F5', duration: 0.5 }, { note: 'G5', duration: 1.0 },
+            { note: 'F5', duration: 0.5 }, { note: 'D#5', duration: 0.5 }, { note: 'D5', duration: 0.5 }, { note: 'C5', duration: 0.5 },
+            // Heroic Resolution
+            { note: 'C5', duration: 0.5 }, { note: 'A#4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
+            { note: 'D#4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
+            { note: 'A#4', duration: 0.5 }, { note: 'C5', duration: 0.5 }, { note: 'D5', duration: 1.0 },
+            { note: 'C5', duration: 2.0 }, { note: 'G4', duration: 2.0 },
         ]);
+        
         this.createMusicTrack('mystic', 90, [
-             // Part 1: Slow and spacious
+            // Ethereal Opening
             { note: 'C3', duration: 1.5 }, { note: 'G3', duration: 0.5 }, { note: 'A#3', duration: 1.5 }, { note: 'F3', duration: 0.5 },
             { note: 'D#3', duration: 1.5 }, { note: 'A#3', duration: 0.5 }, { note: 'D3', duration: 1.5 }, { note: 'G3', duration: 0.5 },
-            // Part 2: Building tension
+            { note: 'C4', duration: 1.0 }, { note: 'G3', duration: 0.5 }, { note: 'D#4', duration: 1.0 }, { note: 'A#3', duration: 0.5 },
+            // Mystical Development
+            { note: 'F4', duration: 0.5 }, { note: 'D#4', duration: 0.5 }, { note: 'D4', duration: 0.5 }, { note: 'C4', duration: 0.5 },
+            { note: 'A#3', duration: 0.5 }, { note: 'C4', duration: 0.5 }, { note: 'D4', duration: 1.0 },
+            { note: 'G4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'D#4', duration: 0.5 }, { note: 'D4', duration: 0.5 },
+            { note: 'C4', duration: 1.0 }, { note: 'G3', duration: 1.0 },
+            // Magic Crescendo
             { note: 'C4', duration: 0.5 }, { note: 'D4', duration: 0.5 }, { note: 'D#4', duration: 1.0 },
             { note: 'F4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'G#4', duration: 1.0 },
-            // Part 3: Climax and release
-            { note: 'C5', duration: 2.0 }, { note: 'G#4', duration: 1.0 },
+            { note: 'A#4', duration: 0.5 }, { note: 'C5', duration: 0.5 }, { note: 'D5', duration: 1.0 },
+            { note: 'D#5', duration: 0.5 }, { note: 'F5', duration: 0.5 }, { note: 'G5', duration: 2.0 },
+            // Magical Climax
+            { note: 'C5', duration: 2.0 }, { note: 'G#4', duration: 1.0 }, { note: 'F4', duration: 1.0 },
             { note: 'G4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'D#4', duration: 2.0 },
-            { note: 'C4', duration: 4.0 }, // Long fade out note
-            // New: Extended section for longer music
+            { note: 'C4', duration: 4.0 },
+            // Extended Mystical Journey
             { note: 'A#3', duration: 1.0 }, { note: 'F3', duration: 0.5 }, { note: 'C4', duration: 1.0 },
             { note: 'D#4', duration: 0.5 }, { note: 'G3', duration: 1.0 }, { note: 'C4', duration: 0.5 },
             { note: 'A#3', duration: 1.0 }, { note: 'D4', duration: 0.5 }, { note: 'F4', duration: 1.0 },
             { note: 'G#4', duration: 0.5 }, { note: 'C5', duration: 1.5 }, { note: 'A#4', duration: 0.5 },
             { note: 'G4', duration: 1.0 }, { note: 'F4', duration: 0.5 }, { note: 'D#4', duration: 1.0 },
-            { note: 'C4', duration: 2.0 },
-            // Repeat a variation for even more length
+            { note: 'C4', duration: 2.0 }, { note: 'G3', duration: 1.0 }, { note: 'C3', duration: 3.0 },
+            // Ethereal Outro with Harmony
             { note: 'C3', duration: 1.0 }, { note: 'G3', duration: 0.5 }, { note: 'A#3', duration: 1.0 },
             { note: 'F3', duration: 0.5 }, { note: 'D#3', duration: 1.0 }, { note: 'A#3', duration: 0.5 },
             { note: 'D3', duration: 1.0 }, { note: 'G3', duration: 0.5 }, { note: 'C4', duration: 1.0 },
             { note: 'D4', duration: 0.5 }, { note: 'D#4', duration: 1.0 }, { note: 'F4', duration: 0.5 },
             { note: 'G4', duration: 1.0 }, { note: 'G#4', duration: 0.5 }, { note: 'C5', duration: 2.0 },
             { note: 'G#4', duration: 1.0 }, { note: 'G4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
-            { note: 'D#4', duration: 2.0 }, { note: 'C4', duration: 4.0 }
+            { note: 'D#4', duration: 2.0 }, { note: 'C4', duration: 4.0 }, { note: 'C3', duration: 4.0 }
         ]);
-        this.isInitialized = true;
-        console.log("Sounds and music preloaded.");
+        
+        console.log("🎵 Sounds and music preloaded");
     }
 
     createSynthSound(frequency, duration, type = 'sine', volume = 0.5) {
@@ -183,59 +250,130 @@ export class AudioManager {
         }
         // We don't need to stop individual notes as they are scheduled with a finite duration.
     }
-    playMusic() {
-        // If context isn't ready, set a flag to play music once it is
-        if (!this.audioContext || this.audioContext.state !== 'running') {
-            this.musicQueuedToPlay = true;
+    startMusic() {
+        console.log("🎵 Starting music system...");
+        
+        if (!this.isInitialized || !this.audioContext) {
+            console.log("🎵 Audio not initialized, cannot start music");
             return;
         }
-        this.stopMusic(); // Stop any previous music loop
+        
+        if (this.audioContext.state !== 'running') {
+            console.log("🎵 AudioContext not running:", this.audioContext.state);
+            return;
+        }
+        
+        this.musicEnabled = true;
+        this.playMusicNow();
+    }
+    
+    playMusic() {
+        // Legacy method for compatibility
+        if (this.userHasInteracted && this.isInitialized) {
+            this.startMusic();
+        }
+    }
+    
+    playMusicNow() {
+        this.stopMusic(); // Stop any existing music
+        this.musicEnabled = true;
+        
         const trackNames = Object.keys(this.musicTracks);
-        if (trackNames.length === 0) return;
-        const playRandomTrack = () => {
-            const name = trackNames[Math.floor(Math.random() * trackNames.length)];
-            const track = this.musicTracks[name];
+        if (trackNames.length === 0) {
+            console.warn("🎵 No music tracks available");
+            return;
+        }
+        
+        console.log("🎵 Starting music playback now...");
+        
+        const playTrack = () => {
+            if (!this.musicEnabled || !this.audioContext || this.audioContext.state !== 'running') {
+                console.log("🎵 Music stopped or audio unavailable");
+                return;
+            }
+            
+            const trackName = trackNames[Math.floor(Math.random() * trackNames.length)];
+            const track = this.musicTracks[trackName];
             const noteDuration = 60 / track.tempo;
-            let trackTotalDuration = 0;
             let scheduleTime = this.audioContext.currentTime;
+            let totalDuration = 0;
+            
+            console.log(`🎵 Playing track: ${trackName}`);
+            
             for (const note of track.sequence) {
                 const freq = this.getNoteFrequency(note.note);
-                const duration = note.duration * noteDuration * 2; // Musical timing adjust
-                if (freq) {
-                    const oscillator = this.audioContext.createOscillator();
-                    const gainNode = this.audioContext.createGain();
-                    oscillator.type = 'triangle';
-                    oscillator.frequency.setValueAtTime(freq, scheduleTime);
-                    gainNode.gain.setValueAtTime(0.2, scheduleTime); // Music volume
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, scheduleTime + duration * 0.9);
-                    oscillator.connect(gainNode);
-                    gainNode.connect(this.audioContext.destination);
-                    oscillator.start(scheduleTime);
-                    oscillator.stop(scheduleTime + duration);
+                const duration = note.duration * noteDuration;
+                
+                if (freq && this.audioContext && this.audioContext.state === 'running') {
+                    try {
+                        const oscillator = this.audioContext.createOscillator();
+                        const gainNode = this.audioContext.createGain();
+                        
+                        oscillator.type = 'triangle';
+                        oscillator.frequency.setValueAtTime(freq, scheduleTime);
+                        gainNode.gain.setValueAtTime(0.08, scheduleTime); // Lower volume
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, scheduleTime + duration * 0.9);
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(this.audioContext.destination);
+                        oscillator.start(scheduleTime);
+                        oscillator.stop(scheduleTime + duration);
+                    } catch (error) {
+                        console.error("🎵 Error creating audio note:", error);
+                    }
                 }
+                
                 scheduleTime += duration;
-                trackTotalDuration += duration;
+                totalDuration += duration;
             }
-            // Set a timeout to play the next random track after this one finishes
-            // Set a timeout to play the next random track after this one finishes, plus a pause
-            const pauseDuration = (Math.random() * 10 + 8) * 1000; // 8-18 second pause
-            this.musicTimeoutId = setTimeout(playRandomTrack, (trackTotalDuration * 1000) + pauseDuration);
+            
+            // Schedule next track with a pause
+            const pauseDuration = 3000 + Math.random() * 5000; // 3-8 second pause
+            this.musicTimeoutId = setTimeout(playTrack, (totalDuration * 1000) + pauseDuration);
         };
-        playRandomTrack();
+        
+        playTrack();
     }
     playSound(soundName) {
-        // Ensure context is running (might need user interaction first)
-        this.tryInitialize(); // Try initializing if not done yet
-         if (!this.audioContext || this.audioContext.state !== 'running') {
-             // console.warn(`AudioContext not running. Cannot play sound: ${soundName}`);
-             return;
-         }
+        // Only play sounds if audio is properly initialized
+        if (!this.audioContext || this.audioContext.state !== 'running' || !this.isInitialized) {
+            return;
+        }
 
         const sound = this.sounds[soundName];
         if (sound) {
             sound();
         } else {
             console.warn(`Sound not found: ${soundName}`);
+        }
+    }
+
+    toggleMusic() {
+        console.log("🎵 Toggle music called. Current state - enabled:", this.musicEnabled, "initialized:", this.isInitialized, "interacted:", this.userHasInteracted);
+        
+        if (!this.userHasInteracted) {
+            console.log("🎵 User hasn't interacted yet - music toggle will work after interaction");
+            return;
+        }
+        
+        if (!this.isInitialized) {
+            console.log("🎵 Audio not initialized, initializing now...");
+            this.initialize().then((success) => {
+                if (success) {
+                    console.log("🎵 Audio initialized for toggle, starting music");
+                    this.startMusic();
+                }
+            });
+            return;
+        }
+        
+        if (this.musicEnabled) {
+            console.log("🎵 Stopping music");
+            this.stopMusic();
+            this.musicEnabled = false;
+        } else {
+            console.log("🎵 Starting music");
+            this.startMusic();
         }
     }
 

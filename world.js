@@ -7,7 +7,7 @@ export const biomes = {
         colors: ['#4CAF50', '#8BC34A', '#CDDC39'], // Vibrant greens with yellow accents
         obstacles: ['tree', 'rock'],
         obstacleDensity: 0.4,
-        decorations: ['grass', 'flower', 'dirtPatch'],
+        decorations: ['grass', 'flower', 'dirtPatch', 'herb'], // Added herbs
         decorationDensity: 0.7,
         terrainNoiseScale: 0.08,
         terrainNoiseStrength: 1.0,
@@ -87,6 +87,7 @@ export class World {
         this.obstacles = [];
         this.interiorObstacles = [];
         this.decorations = [];
+        this.collectibles = []; // Array for interactive items
         this.createGround();
         this.createObstacles();
         this.createDecorations();
@@ -225,6 +226,19 @@ export class World {
             }
             const spriteType = this.biome.decorations[Math.floor(Math.random() * this.biome.decorations.length)];
             const size = 0.5 + Math.random() * 0.2; // Decorations are small
+
+            // Handle collectibles separately
+            if (spriteType === 'herb') {
+                if (Math.random() < 0.1) { // Make herbs relatively rare
+                    const herbMesh = createPixelSprite(spriteType, size);
+                    herbMesh.position.set(posX, size / 2, posZ);
+                    herbMesh.userData = { type: 'herb', collectible: true };
+                    safeAdd(this.overworldContainer, herbMesh);
+                    this.collectibles.push(herbMesh);
+                }
+                continue; // Don't add it as a standard decoration
+            }
+            
             const decorationMesh = createPixelSprite(spriteType, size);
             decorationMesh.position.set(posX, size / 2, posZ);
             safeAdd(this.overworldContainer, decorationMesh);
@@ -232,73 +246,65 @@ export class World {
         }
      }
     createLandmarks() {
-        const landmarkCount = 1; // Create one castle for now
-        for (let i = 0; i < landmarkCount; i++) {
-            let positionFound = false;
-            let attempts = 0;
-            let centerPos;
-            while (!positionFound && attempts < 30) {
-                const posX = (Math.random() - 0.5) * this.worldSize * 0.7;
-                const posZ = (Math.random() - 0.5) * this.worldSize * 0.7;
-                centerPos = new THREE.Vector3(posX, 0, posZ);
-                if (centerPos.length() < 20) { // Keep far from center
-                    attempts++;
-                    continue;
-                }
-                
-                // Check against other landmark centers if we add more
-                positionFound = true; 
-            }
-            if (positionFound) {
-                this.createCastle(centerPos);
-            }
+        // Always create the castle in the center for now
+        this.createCastle(new THREE.Vector3(0, 0, 0));
+        
+        // Add biome-specific landmarks
+        if (this.biome === biomes.GREEN_HILLS) {
+            this.createVillage();
+        } else if (this.biome === biomes.DESERT) {
+            this.createOasis();
+        } else if (this.biome === biomes.MAGIC_FOREST) {
+            this.createMagicalGrove();
+        } else if (this.biome === biomes.VOLCANO) {
+            this.createLavaVents();
+        } else if (this.biome === biomes.MOUNTAINS) {
+            this.createMiningOutpost();
+        } else if (this.biome === biomes.LAKE) {
+            this.createFishingDock();
         }
     }
     createCastle(centerPosition) {
         this.castlePosition = centerPosition.clone();
-        const castleSize = 10; // The visual size of our castle sprite
-        const doorWidth = 2;
-        const doorHeight = 2.5;
+        const castleSize = 12; // Slightly larger castle sprite for better visibility
+        const doorWidth = 5; // Much wider entrance for easy access
+        const doorHeight = 3;
+        
         // Create the main castle sprite (visual only, no collision)
         const castleSprite = createPixelSprite('castle', castleSize);
         castleSprite.position.copy(centerPosition);
         castleSprite.position.y = castleSize / 2; // Lift sprite so base is at y=0
         safeAdd(this.overworldContainer, castleSprite);
-        // Create invisible collision boxes around the sprite
-        const wallThickness = 1; // Make collision box thick
-        const wallHeight = 4; // Tall enough to block player
+        
+        // Create a much simpler collision system - just a basic boundary around the castle
+        // Leave the southern side completely open for easy access
+        const wallThickness = 0.3;
+        const wallHeight = 4;
         
         // Helper to add an invisible wall
         const addInvisibleWall = (size, pos) => {
             const wallGeo = new THREE.BoxGeometry(size.x, size.y, size.z);
-            const wallMat = new THREE.MeshBasicMaterial({ visible: false }); // Invisible!
+            const wallMat = new THREE.MeshBasicMaterial({ visible: false });
             const wallMesh = new THREE.Mesh(wallGeo, wallMat);
             wallMesh.position.copy(pos).add(centerPosition);
-            safeAdd(this.overworldContainer, wallMesh); // Add to scene
-            this.obstacles.push(wallMesh); // But most importantly, add to obstacles
+            safeAdd(this.overworldContainer, wallMesh);
+            this.obstacles.push(wallMesh);
             wallMesh.userData.size = Math.max(size.x, size.z);
         };
         
         const halfSize = castleSize / 2;
-        // North wall (solid)
-        addInvisibleWall(new THREE.Vector3(castleSize + wallThickness, wallHeight, wallThickness), new THREE.Vector3(0, wallHeight / 2, -halfSize));
-        // West wall (solid)
-        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize), new THREE.Vector3(-halfSize, wallHeight / 2, 0));
-        // East wall (solid)
-        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize), new THREE.Vector3(halfSize, wallHeight / 2, 0));
         
-        // South wall (in two parts to leave a gap for the door)
-        const southWallZ = halfSize;
-        const sideWallWidth = (castleSize - doorWidth) / 2;
+        // Only create walls on three sides, leaving the south completely open
+        // North wall (behind the castle)
+        addInvisibleWall(new THREE.Vector3(castleSize, wallHeight, wallThickness), new THREE.Vector3(0, wallHeight / 2, -halfSize - wallThickness));
         
-        // Left part of south wall
-        const leftWallPosX = -halfSize + sideWallWidth / 2;
-        addInvisibleWall(new THREE.Vector3(sideWallWidth, wallHeight, wallThickness), new THREE.Vector3(leftWallPosX, wallHeight / 2, southWallZ));
+        // West wall (left side) - shorter to create an opening
+        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize * 0.6), new THREE.Vector3(-halfSize - wallThickness, wallHeight / 2, -castleSize * 0.2));
         
-        // Right part of south wall
-        const rightWallPosX = halfSize - sideWallWidth / 2;
-        addInvisibleWall(new THREE.Vector3(sideWallWidth, wallHeight, wallThickness), new THREE.Vector3(rightWallPosX, wallHeight / 2, southWallZ));
-        // Create the visible door mesh, which acts as the trigger zone
+        // East wall (right side) - shorter to create an opening  
+        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize * 0.6), new THREE.Vector3(halfSize + wallThickness, wallHeight / 2, -castleSize * 0.2));
+        
+        // Create the door trigger zone - much larger and more accessible
         const doorGeo = new THREE.PlaneGeometry(doorWidth, doorHeight);
         const doorMaterial = new THREE.MeshBasicMaterial({ 
             map: getPixelSpriteTexture('castleDoor', 1),
@@ -306,9 +312,22 @@ export class World {
             alphaTest: 0.1,
         });
         this.castleDoor = new THREE.Mesh(doorGeo, doorMaterial);
-        this.castleDoor.position.set(centerPosition.x, doorHeight / 2, centerPosition.z + southWallZ + 0.01);
+        this.castleDoor.position.set(centerPosition.x, doorHeight / 2, centerPosition.z + halfSize + 0.5);
         safeAdd(this.overworldContainer, this.castleDoor);
-        // This object's position is used to check for entry. It is NOT an obstacle.
+        
+        // Add a visual welcome mat or pathway to guide players
+        const pathGeo = new THREE.PlaneGeometry(doorWidth + 2, 2);
+        const pathMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x8B7355, // Brown path color
+            transparent: true,
+            opacity: 0.7
+        });
+        const pathMesh = new THREE.Mesh(pathGeo, pathMaterial);
+        pathMesh.rotation.x = -Math.PI / 2;
+        pathMesh.position.set(centerPosition.x, 0.01, centerPosition.z + halfSize + 1.5);
+        safeAdd(this.overworldContainer, pathMesh);
+        
+        console.log("🏰 Enhanced castle with simplified collision and clear entrance path");
      }
     createShrines() {
         const shrineCount = 3; // Number of shrines per world
@@ -337,23 +356,26 @@ export class World {
         }
     }
      createCastleInterior() {
-         this.interiorSize = 14; // Increased size slightly for more room
-        const wallHeight = 4;
+         this.interiorSize = 16; // Increased size for more room
+        const wallHeight = 5; // Taller walls for more grandeur
         const wallThickness = 0.5;
         const roomCenter = new THREE.Vector3(100, 0, 100); // Place it far away
         this.castleRoomCenter = roomCenter;
+        // Entry point: South side of the room (where player enters from overworld)
         this.castleInteriorEntryPoint = roomCenter.clone().add(new THREE.Vector3(0, 0, this.interiorSize / 2 - 2));
-        this.castleExitPoint = this.castleInteriorEntryPoint.clone();
-        // Interior floor
+        
+        // Exit point: Much further south, near the actual exit door
+        this.castleExitPoint = roomCenter.clone().add(new THREE.Vector3(0, 0, this.interiorSize / 2 - 0.5));
+        
+        // Interior floor with enhanced texture
         const floorGeo = new THREE.PlaneGeometry(this.interiorSize, this.interiorSize);
-        // Use the stone wall texture for the floor with proper error handling
         let largeCastleWallTexture;
         try {
             largeCastleWallTexture = getPixelSpriteTexture('castleWall', 1, 128);
             if (largeCastleWallTexture) {
                 largeCastleWallTexture.wrapS = THREE.RepeatWrapping;
                 largeCastleWallTexture.wrapT = THREE.RepeatWrapping;
-                largeCastleWallTexture.repeat.set(this.interiorSize / 4, this.interiorSize / 4);
+                largeCastleWallTexture.repeat.set(this.interiorSize / 3, this.interiorSize / 3);
             }
         } catch (error) {
             console.warn('[TextureCheck] Error creating castleWall texture:', error);
@@ -362,92 +384,216 @@ export class World {
         
         const floorMat = new THREE.MeshLambertMaterial({
             map: largeCastleWallTexture,
-            color: largeCastleWallTexture ? 0xffffff : 0x666666 // Gray fallback if no texture
+            color: largeCastleWallTexture ? 0xffffff : 0x666666
         });
         const floorMesh = new THREE.Mesh(floorGeo, floorMat);
         floorMesh.rotation.x = -Math.PI / 2;
         floorMesh.position.copy(roomCenter);
         safeAdd(this.interiorContainer, floorMesh);
-        // Interior walls - reuse the same texture for consistency
+        
+        // Enhanced interior walls
         const wallMaterial = new THREE.MeshLambertMaterial({
             map: largeCastleWallTexture,
-            color: largeCastleWallTexture ? 0xffffff : 0x555555 // Darker gray fallback for walls
+            color: largeCastleWallTexture ? 0xffffff : 0x555555
         });
+        
         const walls = [
-             // North wall (behind throne)
+            // North wall (behind throne)
             { pos: new THREE.Vector3(0, wallHeight / 2, -this.interiorSize / 2), size: new THREE.Vector3(this.interiorSize, wallHeight, wallThickness) },
-             // South wall (with exit) - we leave a gap, no wall needed as it's the exit zone
-            // { pos: new THREE.Vector3(0, wallHeight / 2, this.interiorSize / 2), size: new THREE.Vector3(this.interiorSize, wallHeight, wallThickness) },
-             // West wall
+            // West wall
             { pos: new THREE.Vector3(-this.interiorSize / 2, wallHeight / 2, 0), size: new THREE.Vector3(wallThickness, wallHeight, this.interiorSize) },
-             // East wall
+            // East wall
             { pos: new THREE.Vector3(this.interiorSize / 2, wallHeight / 2, 0), size: new THREE.Vector3(wallThickness, wallHeight, this.interiorSize) },
+            // Partial south wall (leaving exit area open)
+            { pos: new THREE.Vector3(-this.interiorSize / 4, wallHeight / 2, this.interiorSize / 2), size: new THREE.Vector3(this.interiorSize / 2, wallHeight, wallThickness) },
+            { pos: new THREE.Vector3(this.interiorSize / 4, wallHeight / 2, this.interiorSize / 2), size: new THREE.Vector3(this.interiorSize / 2, wallHeight, wallThickness) },
         ];
+        
         walls.forEach(w => {
             const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(w.size.x, w.size.y, w.size.z), wallMaterial);
-            wallMesh.geometry.attributes.uv.array.forEach((_, i) => {
-                if (i % 2 === 0) wallMesh.geometry.attributes.uv.array[i] *= Math.max(w.size.x, w.size.z);
-                else wallMesh.geometry.attributes.uv.array[i] *= w.size.y;
-            });
             wallMesh.position.copy(w.pos).add(roomCenter);
             safeAdd(this.interiorContainer, wallMesh);
-            // This is a BoxGeometry, not a sprite, so collision check needs adjustment if we use size.
-            // For now, we rely on the bounds check.
         });
+        
         // Helper to add decorative sprites
         const addDecoration = (spriteType, size, position, rotationY = 0) => {
             const deco = createPixelSprite(spriteType, size);
             deco.position.copy(position);
             deco.rotation.y = rotationY;
-            deco.position.y = 0.01; // Place slightly above floor to prevent z-fighting
+            deco.position.y = size / 2; // Proper positioning
             safeAdd(this.interiorContainer, deco);
             return deco;
         };
-        // Add Throne
-        const throneSize = 2;
-        const throne = addDecoration('throne', throneSize, roomCenter.clone().add(new THREE.Vector3(0, throneSize / 2, -this.interiorSize / 2 + 2)));
+        
+        // Enhanced Throne with more grandeur
+        const throneSize = 2.5;
+        const throne = addDecoration('throne', throneSize, roomCenter.clone().add(new THREE.Vector3(0, 0, -this.interiorSize / 2 + 2.5)));
         throne.userData.size = throneSize;
-        // this.interiorObstacles.push(throne); // The throne should be interactable, not a solid obstacle
-        this.throne = throne; // Store a direct reference
-        // Add Fireplace with Light
-        const fireplaceSize = 1.5;
-        const fireplace = addDecoration('fireplace', fireplaceSize, roomCenter.clone().add(new THREE.Vector3(this.interiorSize/2 - 0.5, fireplaceSize/2, -3)), -Math.PI / 2);
+        this.throne = throne;
+        
+        // Add decorative pillars
+        const pillarSize = 1.2;
+        const createPillar = (posX, posZ) => {
+            const pillar = addDecoration('torch', pillarSize, roomCenter.clone().add(new THREE.Vector3(posX, 0, posZ)));
+            pillar.scale.y = 3; // Make it taller like a pillar
+            pillar.userData.size = pillarSize;
+            this.interiorObstacles.push(pillar);
+            
+            // Add light at the top of each pillar
+            const pillarLight = new THREE.PointLight(0xffd700, 1.8, 10, 2);
+            pillarLight.position.copy(pillar.position).add(new THREE.Vector3(0, 2.5, 0));
+            pillarLight.userData.baseIntensity = pillarLight.intensity;
+            pillarLight.userData.flickerOffset = Math.random() * 100;
+            safeAdd(this.interiorContainer, pillarLight);
+            this.torchLights.push(pillarLight);
+        };
+        
+        // Place pillars symmetrically
+        createPillar(-4, -2);
+        createPillar(4, -2);
+        createPillar(-4, 2);
+        createPillar(4, 2);
+        
+        // Enhanced Fireplace
+        const fireplaceSize = 2;
+        const fireplace = addDecoration('fireplace', fireplaceSize, roomCenter.clone().add(new THREE.Vector3(this.interiorSize/2 - 1, 0, -4)), -Math.PI / 2);
         fireplace.userData.size = fireplaceSize;
         this.interiorObstacles.push(fireplace);
-        const fireLight = new THREE.PointLight(0xff6600, 2, 8, 2);
-        fireLight.position.copy(fireplace.position).add(new THREE.Vector3(-0.2, 0.2, 0));
+        
+        // Enhanced fireplace lighting
+        const fireLight = new THREE.PointLight(0xff4500, 3, 12, 2);
+        fireLight.position.copy(fireplace.position).add(new THREE.Vector3(-0.3, 1, 0));
         fireLight.userData.baseIntensity = fireLight.intensity;
         fireLight.userData.flickerOffset = Math.random() * 100;
         safeAdd(this.interiorContainer, fireLight);
-        this.torchLights.push(fireLight); // Add to same flicker system
-        // Add Torches with dynamic lights next to the throne
-        const torchY = 2; // Height on the wall
-        const createTorchWithLight = (position) => {
-            const torchSize = 1;
-            const torch = createPixelSprite('torch', torchSize);
-            torch.position.copy(position);
-            safeAdd(this.interiorContainer, torch);
-            const torchLight = new THREE.PointLight(0xffaa33, 1.5, 7, 2);
-            torchLight.position.copy(position).add(new THREE.Vector3(0, 0.2, 0)); // Light emanates slightly above base
-            torchLight.userData.baseIntensity = torchLight.intensity;
-            torchLight.userData.flickerOffset = Math.random() * 100;
-            safeAdd(this.interiorContainer, torchLight);
-            this.torchLights.push(torchLight);
-        };
-        const throneZ = -this.interiorSize / 2 + 1.5;
-        createTorchWithLight(roomCenter.clone().add(new THREE.Vector3(-2.5, torchY, throneZ)));
-        createTorchWithLight(roomCenter.clone().add(new THREE.Vector3(2.5, torchY, throneZ)));
-        // Add Bookshelves
-        const bookshelfSize = new THREE.Vector3(1, 2.5, 1);
-        const createBookshelf = (posX, posZ) => {
-            const shelf = addDecoration('bookshelf', bookshelfSize.x, roomCenter.clone().add(new THREE.Vector3(posX, bookshelfSize.y / 2, posZ)));
-            shelf.scale.y = bookshelfSize.y / bookshelfSize.x; // Adjust height
-            shelf.userData.size = bookshelfSize.x;
+        this.torchLights.push(fireLight);
+        
+        // Multiple Bookshelves along walls
+        const bookshelfSize = 1.2;
+        const createBookshelf = (posX, posZ, rotY = 0) => {
+            const shelf = addDecoration('bookshelf', bookshelfSize, roomCenter.clone().add(new THREE.Vector3(posX, 0, posZ)), rotY);
+            shelf.userData.size = bookshelfSize;
+            shelf.userData.isInteractable = true;
+            shelf.userData.interactionText = "Read ancient tomes";
             this.interiorObstacles.push(shelf);
         };
-        const bookshelfWallOffset = -this.interiorSize / 2 + 0.5;
-        createBookshelf(bookshelfWallOffset, -2);
-        createBookshelf(bookshelfWallOffset, 2);
+        
+        // Bookshelves along the north wall
+        createBookshelf(-5, -this.interiorSize / 2 + 0.8);
+        createBookshelf(-1.5, -this.interiorSize / 2 + 0.8);
+        createBookshelf(1.5, -this.interiorSize / 2 + 0.8);
+        createBookshelf(5, -this.interiorSize / 2 + 0.8);
+        
+        // Multiple treasure chests
+        const chestSize = 1.2;
+        const createTreasureChest = (posX, posZ, hasLoot = true, lootType = 'gold') => {
+            const chest = addDecoration('chest', chestSize, roomCenter.clone().add(new THREE.Vector3(posX, 0, posZ)));
+            chest.userData.size = chestSize;
+            chest.userData.isInteractable = true;
+            chest.userData.interactionText = hasLoot ? "Open treasure chest" : "Empty chest";
+            chest.userData.hasLoot = hasLoot;
+            chest.userData.opened = false;
+            
+            if (hasLoot) {
+                const lootOptions = {
+                    gold: [
+                        { name: 'Gold Coins', quantity: 100, type: 'currency' },
+                        { name: 'Ruby Gem', quantity: 1, type: 'valuable' }
+                    ],
+                    equipment: [
+                        { name: 'Royal Blade', quantity: 1, type: 'weapon' },
+                        { name: 'Crown of Kings', quantity: 1, type: 'armor' }
+                    ],
+                    magical: [
+                        { name: 'Scroll of Power', quantity: 1, type: 'consumable' },
+                        { name: 'Mana Crystal', quantity: 3, type: 'material' }
+                    ]
+                };
+                chest.userData.loot = lootOptions[lootType] || lootOptions.gold;
+            }
+            
+            this.interiorObstacles.push(chest);
+            return chest;
+        };
+        
+        // Place treasure chests strategically
+        createTreasureChest(this.interiorSize / 2 - 2, this.interiorSize / 2 - 2, true, 'gold');
+        createTreasureChest(-this.interiorSize / 2 + 2, this.interiorSize / 2 - 2, true, 'equipment');
+        createTreasureChest(6, -6, true, 'magical');
+        createTreasureChest(-6, -6, false); // Empty chest
+        
+        // Enhanced royal banners
+        const bannerSize = 1.8;
+        const createBanner = (posX, posZ, rotY = 0) => {
+            const banner = addDecoration('banner', bannerSize, roomCenter.clone().add(new THREE.Vector3(posX, 1, posZ)), rotY);
+            banner.userData.size = bannerSize;
+            banner.userData.isInteractable = true;
+            banner.userData.interactionText = "Examine royal heraldry";
+            return banner;
+        };
+        
+        // Banners on side walls
+        createBanner(-this.interiorSize / 2 + 0.3, -3, Math.PI / 2);
+        createBanner(-this.interiorSize / 2 + 0.3, 3, Math.PI / 2);
+        createBanner(this.interiorSize / 2 - 0.3, -3, -Math.PI / 2);
+        createBanner(this.interiorSize / 2 - 0.3, 3, -Math.PI / 2);
+        
+        // Enhanced mystical altar
+        const altarSize = 1.5;
+        const altar = addDecoration('altar', altarSize, roomCenter.clone().add(new THREE.Vector3(0, 0, -5)));
+        altar.userData.size = altarSize;
+        altar.userData.isInteractable = true;
+        altar.userData.interactionText = "Touch the mystical altar";
+        altar.userData.altarType = "royal";
+        this.interiorObstacles.push(altar);
+        
+        // Mystical lighting for the altar
+        const altarLight = new THREE.PointLight(0x9400d3, 2, 8, 2);
+        altarLight.position.copy(altar.position).add(new THREE.Vector3(0, 1, 0));
+        altarLight.userData.baseIntensity = altarLight.intensity;
+        altarLight.userData.flickerOffset = Math.random() * 100;
+        safeAdd(this.interiorContainer, altarLight);
+        this.torchLights.push(altarLight);
+        
+        // Add exit trigger zone - make it clearly visible
+        const exitTriggerGeo = new THREE.PlaneGeometry(4, 1);
+        const exitTriggerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00ff00, 
+            transparent: true, 
+            opacity: 0.3 
+        });
+        const exitTrigger = new THREE.Mesh(exitTriggerGeo, exitTriggerMaterial);
+        exitTrigger.rotation.x = -Math.PI / 2;
+        exitTrigger.position.copy(roomCenter).add(new THREE.Vector3(0, 0.02, this.interiorSize / 2 - 1));
+        safeAdd(this.interiorContainer, exitTrigger);
+        
+        // Store castle NPCs for later integration
+        this.castleNPCs = [];
+        const createGuardNPC = (posX, posZ, name, dialogue) => {
+            const guardPosition = roomCenter.clone().add(new THREE.Vector3(posX, 0, posZ));
+            const guardData = {
+                type: 'GUARD',
+                name: name,
+                position: guardPosition,
+                dialogue: dialogue,
+                isStationary: true,
+                region: 'CASTLE'
+            };
+            this.castleNPCs.push(guardData);
+            return guardData;
+        };
+        
+        createGuardNPC(3, 4, 'Royal Guard Captain', [
+            "Welcome to the royal throne room, traveler. You stand in the heart of the kingdom.",
+            "The throne has awaited a worthy ruler for generations. Perhaps that ruler is you?"
+        ]);
+        
+        createGuardNPC(-3, 4, 'Castle Steward', [
+            "These halls have seen the rise and fall of many kings. The treasures here are ancient and powerful.",
+            "The mystical altar behind the throne holds great power. Approach it with reverence."
+        ]);
+        
+        console.log("🏰 Enhanced castle interior with detailed decorations, lighting, and clear teleportation zones");
     }
     update(deltaTime) {
         const time = Date.now() * 0.008; // Flicker speed
@@ -463,6 +609,180 @@ export class World {
         this.container.remove(this.interiorContainer);
         // You might still want to call dispose on geometries/materials if needed
         // but for now, this removes them from the scene.
+    }
+    createVillage() {
+        // Create a small village in Green Hills biome
+        const villageCenter = new THREE.Vector3(15, 0, 15);
+        
+        // Village houses
+        const housePositions = [
+            new THREE.Vector3(12, 0, 12),
+            new THREE.Vector3(18, 0, 10),
+            new THREE.Vector3(20, 0, 16),
+            new THREE.Vector3(14, 0, 20),
+            new THREE.Vector3(10, 0, 18)
+        ];
+        
+        housePositions.forEach((pos, index) => {
+            const spriteType = index === 1 ? 'villageShop' : 'villageHouse'; // One shop
+            const houseSize = 1.5;
+            const house = createPixelSprite(spriteType, houseSize);
+            house.position.copy(pos);
+            house.position.y = houseSize / 2 + 0.01; // raise slightly above ground to prevent z-fighting
+            safeAdd(this.overworldContainer, house);
+            
+            // Add to obstacles for collision
+            this.obstacles.push({
+                position: pos,
+                size: 1.5
+            });
+        });
+        
+        // Village well in center
+        const wellSize = 1.0;
+        const well = createPixelSprite('villageWell', wellSize);
+        well.position.copy(villageCenter);
+        well.position.y = wellSize / 2 + 0.01;
+        safeAdd(this.overworldContainer, well);
+        
+        this.obstacles.push({
+            position: villageCenter,
+            size: 1.0
+        });
+        
+        console.log("🏘️ Created village with", housePositions.length, "buildings and a well");
+    }
+    
+    createOasis() {
+        // Desert oasis with palm trees and water
+        const oasisCenter = new THREE.Vector3(-18, 0, -12);
+        
+        // Create water patch (using blue ground texture)
+        const waterGeometry = new THREE.CircleGeometry(4, 16);
+        const waterMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x4FC3F7, 
+            transparent: true, 
+            opacity: 0.8 
+        });
+        const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+        waterMesh.rotation.x = -Math.PI / 2;
+        waterMesh.position.copy(oasisCenter);
+        waterMesh.position.y = 0.01;
+        safeAdd(this.overworldContainer, waterMesh);
+        
+        // Palm trees around oasis (using modified tree sprites)
+        const palmPositions = [
+            new THREE.Vector3(-15, 0, -15),
+            new THREE.Vector3(-21, 0, -9),
+            new THREE.Vector3(-16, 0, -8),
+            new THREE.Vector3(-20, 0, -15)
+        ];
+        
+        palmPositions.forEach(pos => {
+            const palmSize = 1.2;
+            const palm = createPixelSprite('tree', palmSize); // Will enhance this later
+            palm.position.copy(pos);
+            palm.position.y = palmSize / 2 + 0.01;
+            safeAdd(this.overworldContainer, palm);
+            
+            this.obstacles.push({
+                position: pos,
+                size: 1.2
+            });
+        });
+        
+        console.log("🌴 Created desert oasis");
+    }
+    
+    createMagicalGrove() {
+        // Magic forest special grove
+        const groveCenter = new THREE.Vector3(-15, 0, 15);
+        
+        // Magical crystal formations
+        const crystalPositions = [
+            new THREE.Vector3(-12, 0, 18),
+            new THREE.Vector3(-18, 0, 12),
+            new THREE.Vector3(-15, 0, 15),
+        ];
+        
+        crystalPositions.forEach(pos => {
+            const crystalSize = 1.0;
+            const crystal = createPixelSprite('shrine', crystalSize); // Reuse shrine sprite
+            crystal.position.copy(pos);
+            crystal.position.y = crystalSize / 2 + 0.01;
+            safeAdd(this.overworldContainer, crystal);
+            
+            // Add magical glow effect
+            const light = new THREE.PointLight(0x9C27B0, 0.5, 10);
+            light.position.copy(pos);
+            light.position.y = 1;
+            safeAdd(this.overworldContainer, light);
+        });
+        
+        console.log("✨ Created magical grove");
+    }
+    
+    createLavaVents() {
+        // Volcano biome lava vents
+        const ventPositions = [
+            new THREE.Vector3(18, 0, -18),
+            new THREE.Vector3(-20, 0, 20),
+            new THREE.Vector3(15, 0, 22),
+        ];
+        
+        ventPositions.forEach(pos => {
+            // Create lava vent (using modified rock sprite)
+            const ventSize = 1.0;
+            const vent = createPixelSprite('rock', ventSize);
+            vent.position.copy(pos);
+            vent.position.y = ventSize / 2 + 0.01;
+            safeAdd(this.overworldContainer, vent);
+            
+            // Add orange/red glow for lava
+            const light = new THREE.PointLight(0xFF4500, 0.8, 12);
+            light.position.copy(pos);
+            light.position.y = 1;
+            safeAdd(this.overworldContainer, light);
+        });
+        
+        console.log("🌋 Created lava vents");
+    }
+    
+    createMiningOutpost() {
+        // Mountain mining outpost
+        const outpostPos = new THREE.Vector3(20, 0, -15);
+        
+        const outpostSize = 1.2;
+        const outpost = createPixelSprite('villageHouse', outpostSize);
+        outpost.position.copy(outpostPos);
+        outpost.position.y = outpostSize / 2 + 0.01;
+        safeAdd(this.overworldContainer, outpost);
+        
+        this.obstacles.push({
+            position: outpostPos,
+            size: 1.2
+        });
+        
+        console.log("⛏️ Created mining outpost");
+    }
+    
+    createFishingDock() {
+        // Lake fishing dock
+        const dockPos = new THREE.Vector3(-22, 0, 8);
+        
+        // Simple dock structure (using modified village shop)
+        const dockSize = 1.0;
+        const dock = createPixelSprite('villageShop', dockSize);
+        dock.position.copy(dockPos);
+        dock.position.y = dockSize / 2 + 0.01;
+        safeAdd(this.overworldContainer, dock);
+        
+        this.obstacles.push({
+            position: dockPos,
+            size: 1.0
+        });
+        
+        console.log("🎣 Created fishing dock");
     }
 }
 // Helper to safely add objects to a parent

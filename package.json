@@ -1,13 +1,14 @@
 {
-  "name": "rosebud-game",
+  "name": "pixel-scrolls-rpg",
   "version": "1.0.0",
-  "description": "A pixel art survival game built with Three.js",
+  "description": "An Elder Scrolls-inspired pixel art RPG built with Three.js, featuring exploration, quests, NPCs, and immersive world-building",
   "main": "main.js",
   "scripts": {
     "start": "npx http-server -c-1 -p 3000",
-    "dev": "npx http-server -c-1 -p 3000"
+    "dev": "npx http-server -c-1 -p 3000",
+    "serve": "python3 -m http.server 8000"
   },
-  "keywords": ["game", "pixel-art", "three.js", "survival"],
+  "keywords": ["rpg", "pixel-art", "three.js", "exploration", "quests", "elder-scrolls", "javascript", "game"],
   "author": "",
   "license": "MIT",
   "type": "module"

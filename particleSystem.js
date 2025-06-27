@@ -175,6 +175,25 @@ export class ParticleSystem {
                 lifeRange: [0.8, 1.5],
                 gravity: 1.5,
                 drag: 0.97
+            },
+            attackHit: {
+                count: 15,
+                colors: ['#FFFFFF', '#F0F0F0', '#DDDDDD'],
+                sizeRange: [2, 5],
+                speedRange: [2, 5],
+                lifeRange: [0.2, 0.5],
+                gravity: 1,
+                drag: 0.92
+            },
+            npcInteract: {
+                count: 20,
+                colors: ['#88FF88', '#CCFFCC', '#FFFFFF'],
+                sizeRange: [2, 4],
+                speedRange: [1, 3],
+                lifeRange: [0.5, 1.0],
+                gravity: -0.5, // Rise up
+                drag: 0.95,
+                elevationRange: [0, 0.5]
             }
         };
     }

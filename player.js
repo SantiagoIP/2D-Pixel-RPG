@@ -1,3 +1,6 @@
+// ✅ CACHE BUSTER - Player Movement Debug Version - ${Date.now()}
+console.log("🔧 Player.js loaded with movement debugging - Cache cleared:", Date.now());
+
 import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 import { createPixelSprite, createAttackSprite } from './spriteUtils.js';
 
@@ -9,26 +12,8 @@ class AttackProjectile {
         // Create the projectile mesh
         this.mesh = createAttackSprite(this.size);
         
-        // Set color based on attack type - handle different material types
-        if (this.mesh.material.uniforms && this.mesh.material.uniforms.u_color) {
-            // ShaderMaterial with uniforms
-            if (attackType === 'magic') {
-                this.mesh.material.uniforms.u_color.value.setHex(0x00ffff); // Cyan for magic
-            } else if (attackType === 'ranged') {
-                this.mesh.material.uniforms.u_color.value.setHex(0xffaa00); // Orange for ranged
-            } else {
-                this.mesh.material.uniforms.u_color.value.setHex(0xffffff); // White for melee
-            }
-        } else if (this.mesh.material.color) {
-            // MeshBasicMaterial with color property
-            if (attackType === 'magic') {
-                this.mesh.material.color.setHex(0x00ffff); // Cyan for magic
-            } else if (attackType === 'ranged') {
-                this.mesh.material.color.setHex(0xffaa00); // Orange for ranged
-            } else {
-                this.mesh.material.color.setHex(0xffffff); // White for melee
-            }
-        }
+        // Enhanced color handling for different material types
+        this.setProjectileColor(attackType);
         
         this.mesh.position.copy(position);
         this.mesh.position.y = 0.5; // Keep slightly above ground
@@ -38,14 +23,47 @@ class AttackProjectile {
         this.aliveTime = 0;
         this.damage = attackType === 'magic' ? 3 : attackType === 'ranged' ? 2 : 1;
     }
+    
+    setProjectileColor(attackType) {
+        if (!this.mesh || !this.mesh.material) return;
+        
+        const material = this.mesh.material;
+        let targetColor;
+        
+        switch (attackType) {
+            case 'magic':
+                targetColor = 0x00ffff; // Cyan for magic
+                break;
+            case 'ranged':
+                targetColor = 0xffaa00; // Orange for ranged
+                break;
+            default:
+                targetColor = 0xffffff; // White for melee
+                break;
+        }
+        
+        // Handle different material types
+        if (material.uniforms && material.uniforms.u_color) {
+            // ShaderMaterial with uniforms
+            material.uniforms.u_color.value.setHex(targetColor);
+        } else if (material.color) {
+            // MeshBasicMaterial with color property
+            material.color.setHex(targetColor);
+        }
+    }
 
     update(deltaTime) {
+        if (!this.mesh || !this.mesh.position) return;
+        
         this.mesh.position.add(this.direction.clone().multiplyScalar(this.speed * deltaTime));
         this.aliveTime += deltaTime;
         
-        // Add some visual effects
+        // Add visual effects based on attack type
         if (this.attackType === 'magic') {
             this.mesh.rotation.z += deltaTime * 10; // Spin magic projectiles
+        } else if (this.attackType === 'ranged') {
+            // Slight wobble for arrows
+            this.mesh.rotation.z = Math.sin(this.aliveTime * 20) * 0.1;
         }
     }
 
@@ -58,7 +76,7 @@ class AttackProjectile {
     }
 
     dispose() {
-        if (this.mesh.dispose) {
+        if (this.mesh && this.mesh.dispose) {
             this.mesh.dispose();
         }
     }
@@ -101,6 +119,12 @@ export class Player {
         this.baseAttackLifetime = 0.2;
         this.attackLifetime = this.baseAttackLifetime;
         
+        // Equipment bonuses (initialized to 0)
+        this.equipmentAttackBonus = 0;
+        this.equipmentDefenseBonus = 0;
+        this.equipmentSpeedBonus = 0;
+        this.equipmentHealthBonus = 0;
+        
         // New combat mechanics
         this.currentWeapon = 'sword'; // sword, bow, staff
         this.weaponLevel = 1;
@@ -124,12 +148,13 @@ export class Player {
         this.xpToNextLevel = 20;
         this.activeBuffs = {};
         this.isInvulnerable = false;
-        this.invulnerabilityDuration = 1.0;
+        this.invulnerabilityDuration = 2.0; // Extended to 2 seconds for better recovery time
         this.invulnerabilityTimer = 0;
         
         // Combat feedback
         this.lastHitTime = 0;
         this.hitFlashDuration = 0.1;
+        this.interactionRadius = 1.5; // For picking up items
     }
 
     isAlive() {
@@ -205,6 +230,11 @@ export class Player {
     takeDamage(amount) {
         if (this.isInvulnerable) return;
         
+        // Apply equipment defense bonus
+        const totalDefense = this.equipmentDefenseBonus || 0;
+        const originalAmount = amount;
+        amount = Math.max(1, amount - totalDefense); // Minimum 1 damage
+        
         // Check for dodge
         if (Math.random() < this.dodgeChance) {
             console.log('Dodged the attack!');
@@ -232,7 +262,11 @@ export class Player {
         this.invulnerabilityTimer = this.invulnerabilityDuration;
         this.lastHitTime = performance.now() / 1000;
         
-        console.log(`Player took ${amount} damage, HP left: ${this.currentHealth}`);
+        if (totalDefense > 0) {
+            console.log(`Player took ${amount} damage (${originalAmount} - ${totalDefense} defense), HP left: ${this.currentHealth}`);
+        } else {
+            console.log(`Player took ${amount} damage, HP left: ${this.currentHealth}`);
+        }
         
         // Visual feedback
         if (this.particleSystem) {
@@ -256,26 +290,27 @@ export class Player {
         
         // Determine attack type based on weapon
         let attackType = 'melee';
-        let damage = this.attackDamage;
+        let baseDamage = this.attackDamage + (this.equipmentAttackBonus || 0); // Include equipment bonus
+        let damage = baseDamage;
         let size = this.attackSize;
         let lifetime = this.attackLifetime;
         
         switch (this.currentWeapon) {
             case 'bow':
                 attackType = 'ranged';
-                damage = this.attackDamage * 1.5;
+                damage = baseDamage * 1.5;
                 size = this.attackSize * 0.8;
                 lifetime = this.attackLifetime * 2;
                 break;
             case 'staff':
                 attackType = 'magic';
-                damage = this.attackDamage * 2;
+                damage = baseDamage * 2;
                 size = this.attackSize * 1.2;
                 lifetime = this.attackLifetime * 1.5;
                 break;
             default: // sword
                 attackType = 'melee';
-                damage = this.attackDamage;
+                damage = baseDamage;
                 size = this.attackSize;
                 lifetime = this.attackLifetime;
                 break;
@@ -295,6 +330,12 @@ export class Player {
         projectile.damage = damage;
         projectile.isCritical = isCritical;
         
+        // Add visual impact particle effect at attack point
+        const attackPos = this.mesh.position.clone().add(attackDirection.multiplyScalar(this.size * 0.7));
+        if (typeof this.particleSystem.createEffect === 'function') {
+            this.particleSystem.createEffect('attackHit', attackPos);
+        }
+        
         return projectile;
     }
 
@@ -304,19 +345,22 @@ export class Player {
             this.currentWeapon = weaponType;
             console.log(`Switched to ${weaponType}`);
             
+            // Calculate effective base speed including equipment
+            const effectiveBaseSpeed = this.baseSpeed + (this.equipmentSpeedBonus || 0);
+            
             // Adjust stats based on weapon - make differences much more noticeable
             switch (weaponType) {
                 case 'bow':
                     this.weaponCooldownMultiplier = 2.5; // Much slower but stronger
-                    this.speed = this.baseSpeed * 0.9; // Slightly slower with bow
+                    this.speed = effectiveBaseSpeed * 0.9; // Slightly slower with bow
                     break;
                 case 'staff':
                     this.weaponCooldownMultiplier = 4; // Very slow but powerful
-                    this.speed = this.baseSpeed * 0.8; // Slower with staff
+                    this.speed = effectiveBaseSpeed * 0.8; // Slower with staff
                     break;
                 default: // sword
                     this.weaponCooldownMultiplier = 1.0; // Normal speed
-                    this.speed = this.baseSpeed;
+                    this.speed = effectiveBaseSpeed;
                     break;
             }
         }
@@ -326,19 +370,28 @@ export class Player {
         this.velocity.set(0, 0, 0);
         this.moveDirection.set(0,0,0);
 
-        // Vertical movement
-        if (this.inputHandler.keys['KeyW'] || this.inputHandler.keys['ArrowUp']) {
+        // Check if input handler is available
+        if (!this.inputHandler) {
+            console.error("❌ InputHandler is not available!");
+            return this.velocity;
+        }
+
+        const keys = this.inputHandler.keys;
+
+        // Vertical movement (Arrow Keys Only for AZERTY compatibility)
+        if (keys['ArrowUp']) {
             this.velocity.z = -1;
             this.moveDirection.z = -1;
-        } else if (this.inputHandler.keys['KeyS'] || this.inputHandler.keys['ArrowDown']) {
+        } else if (keys['ArrowDown']) {
             this.velocity.z = 1;
             this.moveDirection.z = 1;
         }
-        // Horizontal movement
-        if (this.inputHandler.keys['KeyA'] || this.inputHandler.keys['ArrowLeft']) {
+        
+        // Horizontal movement (Arrow Keys Only for AZERTY compatibility)
+        if (keys['ArrowLeft']) {
             this.velocity.x = -1;
             this.moveDirection.x = -1;
-        } else if (this.inputHandler.keys['KeyD'] || this.inputHandler.keys['ArrowRight']) {
+        } else if (keys['ArrowRight']) {
             this.velocity.x = 1;
             this.moveDirection.x = 1;
         }
@@ -351,8 +404,9 @@ export class Player {
             this.moveDirection.normalize();
          }
 
-
         this.velocity.multiplyScalar(this.speed * deltaTime);
+        
+        // Return the velocity for use in update function
         return this.velocity;
     }
 
@@ -366,6 +420,7 @@ export class Player {
         }
         // Obstacle collision check (simple AABB)
         for (const obstacle of obstacles) {
+            if (!obstacle || !obstacle.userData || typeof obstacle.userData.size !== 'number') continue;
             const obstaclePos = obstacle.position;
             const obstacleSize = obstacle.userData.size || 1; // Assuming size is stored or default
             const halfObstacleSize = obstacleSize / 2;
@@ -386,120 +441,123 @@ export class Player {
         return false; // No collision
     }
 
-
     updateBuffs(deltaTime) {
-        // Reset temporary stats to base values before recalculating
-        this.speed = this.baseSpeed;
+        // Reset stats to base values + equipment bonuses before reapplying buffs
+        this.speed = this.baseSpeed + (this.equipmentSpeedBonus || 0);
         this.attackDamage = this.baseAttackDamage;
-        this.attackSize = this.baseAttackSize;
-        this.attackLifetime = this.baseAttackLifetime;
-        
-        // Calculate attack cooldown with weapon multiplier
         this.attackCooldown = this.baseAttackCooldown * this.weaponCooldownMultiplier;
-        
+
         for (const buffId in this.activeBuffs) {
             const buff = this.activeBuffs[buffId];
-            if (isFinite(buff.duration)) {
-                buff.timeLeft -= deltaTime;
-                if (buff.timeLeft <= 0) {
-                    console.log(`Buff ${buff.name} expired.`);
-                    delete this.activeBuffs[buffId];
-                    continue; // Skip to next buff
-                }
-            }
-            // Apply buff effect
-            switch (buff.id) {
-                case 'speed':
-                    this.speed *= buff.potency;
-                    break;
-                case 'attack_speed':
-                    this.attackCooldown *= buff.potency;
-                    break;
+            buff.timeLeft -= deltaTime;
+
+            if (buff.timeLeft <= 0) {
+                console.log(`Buff ${buff.name} expired.`);
+                delete this.activeBuffs[buffId];
+            } else {
+                // Apply buff effects
+                if (buff.effects.speed) this.speed *= buff.effects.speed;
+                if (buff.effects.attackDamage) this.attackDamage *= buff.effects.attackDamage;
+                if (buff.effects.attackSpeed) this.attackCooldown *= (1 / buff.effects.attackSpeed);
             }
         }
     }
 
-    update(deltaTime, obstacles, worldSize, worldCenter = new THREE.Vector3(0,0,0)) {
-        this.updateBuffs(deltaTime); // Update buffs and their effects
-        this.updateCombatAnimations(deltaTime); // Update combat animations
+    update(deltaTime, obstacles, worldSize, worldCenter = new THREE.Vector3(0,0,0), world, questManager, inventorySystem) {
+        if (!this.isAlive()) return;
+
+        // Calculate movement and apply to position
+        const velocity = this.handleMovement(deltaTime);
         
-        // Handle invulnerability and flashing
+        // Apply movement with collision detection
+        if (velocity.lengthSq() > 0) {
+            const potentialPosition = this.mesh.position.clone().add(velocity);
+            
+            // Check for collisions before moving
+            if (!this.checkCollision(potentialPosition, obstacles, worldSize, worldCenter)) {
+                const oldPosition = this.mesh.position.clone();
+                this.mesh.position.add(velocity);
+            }
+        }
+        
+        this.updateBuffs(deltaTime);
+        this.updateCombatAnimations(deltaTime);
+
         if (this.isInvulnerable) {
             this.invulnerabilityTimer -= deltaTime;
             if (this.invulnerabilityTimer <= 0) {
                 this.isInvulnerable = false;
-                this.mesh.material.uniforms.u_flash.value = 0; // Ensure flash is off
             }
         }
         
-        // Handle blocking (hold Shift to block)
-        this.isBlocking = this.inputHandler.keys['ShiftLeft'] || this.inputHandler.keys['ShiftRight'];
-        
-        // Handle combat stance (hold Ctrl for defensive stance)
-        if (this.inputHandler.keys['ControlLeft'] || this.inputHandler.keys['ControlRight']) {
-            this.combatStance = 'defensive';
-            this.speed *= 0.7; // Slower in defensive stance
-            this.blockChance = 0.15; // Higher block chance
-        } else {
-            this.combatStance = 'normal';
-            this.blockChance = 0.05; // Normal block chance
+        if (world && questManager && inventorySystem) {
+            this.checkForCollectibles(world, questManager, inventorySystem);
         }
-        
-        const moveDelta = this.handleMovement(deltaTime);
-        const potentialPosition = this.mesh.position.clone().add(moveDelta);
-        
-        // Check collision before applying movement
-        if (!this.checkCollision(potentialPosition, obstacles, worldSize, worldCenter)) {
-            this.mesh.position.add(moveDelta);
-        } else {
-            // Try sliding along the wall
-            const potentialX = this.mesh.position.clone().add(new THREE.Vector3(moveDelta.x, 0, 0));
-            if (!this.checkCollision(potentialX, obstacles, worldSize, worldCenter)) {
-                this.mesh.position.add(new THREE.Vector3(moveDelta.x, 0, 0));
-            } else {
-                const potentialZ = this.mesh.position.clone().add(new THREE.Vector3(0, 0, moveDelta.z));
-                if (!this.checkCollision(potentialZ, obstacles, worldSize, worldCenter)) {
-                    this.mesh.position.add(new THREE.Vector3(0, 0, moveDelta.z));
+    }
+
+    checkForCollectibles(world, questManager, inventorySystem) {
+        if (!world.collectibles || world.collectibles.length === 0) return;
+
+        const playerPosition = this.mesh.position;
+        const collectiblesToRemove = [];
+
+        for (let i = 0; i < world.collectibles.length; i++) {
+            const collectible = world.collectibles[i];
+            const distance = playerPosition.distanceTo(collectible.position);
+
+            if (distance < this.interactionRadius) {
+                if (collectible.userData.type === 'herb') {
+                    console.log('Collected a healing herb!');
+                    questManager.updateQuestObjective('gather_herbs', 'collect_herbs', 1);
+                    if(inventorySystem) {
+                        inventorySystem.addItem({ name: 'Healing Herb', quantity: 1, type: 'herb' });
+                    }
+                    this.particleSystem.createEffect('pickup', collectible.position);
+                    collectiblesToRemove.push(i);
+                    world.overworldContainer.remove(collectible);
                 }
             }
         }
 
-        // Ensure player stays exactly at ground level (plus half size)
-        this.mesh.position.y = this.size / 2;
-
-        // Ensure shadow follows player
-        if (this.shadowMesh) {
-            this.shadowMesh.position.x = 0;
-            this.shadowMesh.position.z = 0;
-            this.shadowMesh.position.y = -this.size / 2 + 0.01;
+        // Remove collected items from the main array (in reverse to avoid index issues)
+        for (let i = collectiblesToRemove.length - 1; i >= 0; i--) {
+            world.collectibles.splice(collectiblesToRemove[i], 1);
         }
     }
 
-    // Update combat animations
     updateCombatAnimations(deltaTime) {
         if (this.isAttacking) {
             this.attackAnimationTime += deltaTime;
-            
-            // Attack animation - scale up briefly
+
+            // Reduce animation intensity to prevent flickering in tight spaces
             const progress = this.attackAnimationTime / this.attackAnimationDuration;
-            if (progress < 1) {
-                const scale = 1 + Math.sin(progress * Math.PI) * 0.2;
-                this.mesh.scale.setScalar(scale);
-            } else {
-                this.mesh.scale.copy(this.originalScale);
+            const scaleFactor = 1 + Math.sin(progress * Math.PI) * 0.15; // Reduced from 0.3 to 0.15
+            this.mesh.scale.set(this.originalScale.x * (1/scaleFactor), this.originalScale.y * scaleFactor, this.originalScale.z);
+
+            if (this.attackAnimationTime >= this.attackAnimationDuration) {
                 this.isAttacking = false;
+                this.attackAnimationTime = 0;
+                this.mesh.scale.copy(this.originalScale);
+            }
+        } else {
+            // Stable scaling - prevent constant lerping that can cause flickering
+            if (!this.mesh.scale.equals(this.originalScale)) {
+                this.mesh.scale.copy(this.originalScale);
             }
         }
-        
-        // Hit flash effect
-        if (this.isInvulnerable) {
-            const timeSinceHit = (performance.now() / 1000) - this.lastHitTime;
-            if (timeSinceHit < this.hitFlashDuration) {
-                // Flash red when hit
-                this.mesh.material.uniforms.u_flash.value = 0.5;
-            } else {
-                this.mesh.material.uniforms.u_flash.value = 0;
-            }
-        }
+    }
+    
+    getStats() {
+        return {
+            level: this.level,
+            health: this.currentHealth,
+            maxHealth: this.maxHealth,
+            attack: this.attackDamage,
+            defense: Math.floor(this.blockChance * 100), // Convert to percentage
+            experience: this.experience,
+            xpToNextLevel: this.xpToNextLevel,
+            weapon: this.currentWeapon,
+            weaponLevel: this.weaponLevel
+        };
     }
 }

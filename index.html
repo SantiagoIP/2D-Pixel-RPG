@@ -2,13 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Rosebud Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel Scrolls - Elder Scrolls Inspired RPG</title>
+  <link rel="icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABILAAASCwAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A9fX1AP39/QD9/f0A9fX1AP///wD///8A////AP///wD///8A////AP///wD///8A7+/vAP39/QDz8/MA+fn5AP39/QD9/f0A+fn5APPz8wD9/f0A7+/vAP///wD///8A////AP///wD9/f0A6urqAOPj4wDr6+sA8fHxAPn5+QD5+fkA8fHxAOvr6wDj4+MA6urqAP39/QD///8A////AP///wD///8A6enpANPT0wDJyckA0dHRANnZ2QDh4eEA4eHhANnZ2QDR0dEAycnJANPT0wDp6ekA////AP///wD///8A+vr6ANbW1gDCwsIAtra2ALy8vADGxsYAzs7OAM7OzgDGxsYAvLy8ALa2tgDCwsIA1tbWAPr6+gD///8A////APX19QDJyckAtLS0AKioqACmpqYAq6urALOzswCzs7MAq6urAKampqCoqKgAtLS0AMnJyQD19fUA////AP///wD5+fkAwcHBAKSkpACYmJgAlJSUAJqamgCioqIAoqKiAJqamgCUlJQAmJiYAKSkpADBwcEA+fn5AP///wD///8A+fn5AMHBwQCkpKQAmJiYAJSUlACampoAoqKiAKKiogCampqAlJSUAJiYmACkpKQAwcHBAPn5+QD///8A////APX19QDJyckAtLS0AKioqACmpqYAq6urALOzswCzs7MAq6urAKampqCoqKgAtLS0AMnJyQD19fUA////AP///wD6+voA1tbWAMLCwgC2trYAvLy8AMbGxgDOzs4Azs7OAMbGxgC8vLwAtra2AMDAwADW1tYA+vr6AP///wD///8A////AOPj4wDT09MAycnJANHR0QDZ2dkA4eHhAOHh4QDZ2dkA0dHRAMnJyQDT09MA4+PjAP///wD///8A////AP39/QDq6uoA4+PjAOvr6wDx8fEA+fn5APn5+QDx8fEA6+vrAOPj4wDq6uoA/f39AP///wD///8A////AP///wD///8A7+/vAP39/QDz8/MA+fn5AP39/QD9/f0A+fn5APPz8wD9/f0A7+/vAP///wD///8A////AP///wD///8A////AP///wD19fUA/f39AP39/QD19fUA////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==" type="image/x-icon" />
   <style>
     body { 
       margin: 0; 
       padding: 0; 
+      background: radial-gradient(circle, #2e3440 0%, #1e2328 50%, #0a0c0f 100%);
+      color: #d8dee9;
+      font-family: 'Courier New', monospace;
       overflow: hidden; 
-      background: #000; 
+      user-select: none;
     }
     #game { 
       width: 100vw; 
@@ -17,12 +22,414 @@
     }
     canvas { 
       display: block; 
-      margin: 0 auto; 
+      cursor: crosshair; 
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 40px;
+      border-radius: 15px;
+      border: 2px solid #88c0d0;
+      box-shadow: 0 0 20px rgba(136, 192, 208, 0.3);
+    }
+    .loading h1 {
+      margin: 0 0 20px 0;
+      color: #88c0d0;
+      font-size: 28px;
+      text-shadow: 0 0 10px rgba(136, 192, 208, 0.5);
+    }
+    .loading p {
+      margin: 10px 0;
+      color: #d8dee9;
+      font-size: 16px;
+    }
+    
+    /* Tutorial Overlay */
+    #tutorial-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .tutorial-panel {
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      border: 4px solid #88c0d0;
+      border-radius: 15px;
+      padding: 40px;
+      max-width: 800px;
+      color: #d8dee9;
+      box-shadow: 0 0 30px rgba(136, 192, 208, 0.5);
+    }
+    
+    .tutorial-title {
+      color: #88c0d0;
+      font-size: 28px;
+      text-align: center;
+      margin-bottom: 30px;
+      text-shadow: 0 0 10px rgba(136, 192, 208, 0.5);
+    }
+    
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    
+    .control-section h3 {
+      color: #ebcb8b;
+      font-size: 18px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #4c566a;
+      padding-bottom: 5px;
+    }
+    
+    .control-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 8px 0;
+      padding: 5px 0;
+    }
+    
+    .key-combo {
+      background: #3b4252;
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: #88c0d0;
+      font-weight: bold;
+      min-width: 60px;
+      text-align: center;
+    }
+    
+    .action-desc {
+      color: #d8dee9;
+      flex: 1;
+      text-align: right;
+    }
+    
+    .tutorial-tips {
+      background: #2e3440;
+      border: 2px solid #5e81ac;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    
+    .tutorial-tips h4 {
+      color: #5e81ac;
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+    
+    .tutorial-tips ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    
+    .tutorial-tips li {
+      margin: 5px 0;
+      color: #d8dee9;
+    }
+    
+    .start-button {
+      background: linear-gradient(135deg, #88c0d0, #5e81ac);
+      color: #2e3440;
+      border: none;
+      padding: 15px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      margin: 30px auto 0;
+      transition: all 0.3s;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .start-button:hover {
+      background: linear-gradient(135deg, #a3d4e7, #81a1c1);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(136, 192, 208, 0.4);
+    }
+    
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px solid #4c566a;
+      font-size: 12px;
+      line-height: 1.4;
+      z-index: 100;
+      max-width: 300px;
+    }
+    .controls h3 {
+      margin: 0 0 10px 0;
+      color: #88c0d0;
+      font-size: 14px;
+    }
+    .controls div {
+      color: #d8dee9;
+      margin: 2px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    .key {
+      background: #3b4252;
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #88c0d0;
+      font-weight: bold;
+      min-width: 20px;
+      text-align: center;
+    }
+    
+    /* Help Overlay */
+    #help-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1500;
+      font-family: 'Courier New', monospace;
+    }
+    
+    #buff-container {
+      position: absolute;
+      top: 120px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      z-index: 100;
+    }
+    .buff-icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid #888;
+      border-radius: 4px;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .buff-tooltip {
+      display: none;
+      position: absolute;
+      left: 110%;
+      top: 0;
+      background: #111;
+      border: 1px solid #888;
+      padding: 8px;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      width: 200px;
+      z-index: 101;
+      font-family: 'Courier New', monospace;
+    }
+    .buff-icon:hover .buff-tooltip {
+      display: block;
     }
   </style>
 </head>
 <body>
+  <!-- Tutorial Overlay -->
+  <div id="tutorial-overlay">
+    <div class="tutorial-panel">
+      <h1 class="tutorial-title">🏰 Welcome to Pixel Scrolls! 🏰</h1>
+      
+      <div class="controls-grid">
+        <div class="control-section">
+          <h3>🎮 Movement & Combat</h3>
+          <div class="control-item">
+            <span class="key-combo">Arrow Keys</span>
+            <span class="action-desc">Move Player</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">SPACE</span>
+            <span class="action-desc">Attack/Cast Spell</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">1/2/3</span>
+            <span class="action-desc">Switch Weapons</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">E</span>
+            <span class="action-desc">Interact (NPCs, Buildings)</span>
+          </div>
+        </div>
+        
+        <div class="control-section">
+          <h3>📋 Menus & Interface</h3>
+          <div class="control-item">
+            <span class="key-combo">I</span>
+            <span class="action-desc">Inventory</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">J</span>
+            <span class="action-desc">Quest Journal</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">C</span>
+            <span class="action-desc">Crafting Interface</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">M</span>
+            <span class="action-desc">World Map</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">H</span>
+            <span class="action-desc">Help (Show This Again)</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="tutorial-tips">
+        <h4>🌟 Getting Started Tips:</h4>
+        <ul>
+          <li><strong>Talk to NPCs:</strong> Walk up to villagers and press <span class="key-combo">E</span> to start conversations</li>
+          <li><strong>Check Your Quests:</strong> Press <span class="key-combo">J</span> to see your objectives</li>
+          <li><strong>Explore Regions:</strong> Use <span class="key-combo">M</span> to travel between different biomes</li>
+          <li><strong>Gather Resources:</strong> Press <span class="key-combo">F</span> while exploring to collect materials</li>
+          <li><strong>Enter Buildings:</strong> Walk up to doors and press <span class="key-combo">E</span> to enter</li>
+          <li><strong>Need Help?</strong> Press <span class="key-combo">H</span> anytime to see controls again</li>
+        </ul>
+      </div>
+      
+      <button class="start-button" onclick="startGame()">🚀 Start Your Adventure!</button>
+    </div>
+  </div>
+  
+  <!-- Help Overlay (accessible anytime with H key) -->
+  <div id="help-overlay">
+    <div class="tutorial-panel">
+      <h1 class="tutorial-title">🔧 Controls & Help</h1>
+      <div class="controls-grid">
+        <div class="control-section">
+          <h3>🎮 Movement & Combat</h3>
+          <div class="control-item">
+            <span class="key-combo">Arrow Keys</span>
+            <span class="action-desc">Move Player</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">SPACE</span>
+            <span class="action-desc">Attack/Cast Spell</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">1/2/3</span>
+            <span class="action-desc">Switch Weapons</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">E</span>
+            <span class="action-desc">Interact (NPCs, Buildings)</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">F</span>
+            <span class="action-desc">Gather Resources</span>
+          </div>
+        </div>
+        
+        <div class="control-section">
+          <h3>📋 Menus & Interface</h3>
+          <div class="control-item">
+            <span class="key-combo">I</span>
+            <span class="action-desc">Inventory</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">J</span>
+            <span class="action-desc">Quest Journal</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">C</span>
+            <span class="action-desc">Crafting Interface</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">M</span>
+            <span class="action-desc">World Map</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">B</span>
+            <span class="action-desc">Bestiary</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">P/ESC</span>
+            <span class="action-desc">Pause Menu</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">N</span>
+            <span class="action-desc">Toggle Music</span>
+          </div>
+        </div>
+      </div>
+      <button class="start-button" onclick="closeHelp()">Close Help</button>
+    </div>
+  </div>
+
   <div id="game"></div>
+  <div id="level-up-bar"></div>
+  <div id="stat-display"></div>
+  <div id="buff-container"></div>
+  <div id="weapon-display"></div>
+  <div id="interaction-prompt"></div>
+  
+  <!-- Permanent Controls Guide -->
+  <div class="controls">
+    <h3>🎮 Quick Controls</h3>
+    <div><span class="key">Arrow Keys</span> Move</div>
+    <div><span class="key">E</span> Interact</div>
+    <div><span class="key">SPACE</span> Attack</div>
+    <div><span class="key">I</span> Inventory</div>
+    <div><span class="key">J</span> Quests</div>
+    <div><span class="key">H</span> Help</div>
+  </div>
+  
+  <script>
+    function startGame() {
+      document.getElementById('tutorial-overlay').style.display = 'none';
+      // Dispatch event to tell the game that tutorial is complete
+      window.dispatchEvent(new CustomEvent('tutorialComplete'));
+    }
+    
+    function closeHelp() {
+      document.getElementById('help-overlay').style.display = 'none';
+    }
+    
+    // Add H key listener for help
+    document.addEventListener('keydown', function(e) {
+      if (e.code === 'KeyH') {
+        const helpOverlay = document.getElementById('help-overlay');
+        if (helpOverlay.style.display === 'none' || !helpOverlay.style.display) {
+          helpOverlay.style.display = 'flex';
+        } else {
+          helpOverlay.style.display = 'none';
+        }
+      }
+    });
+  </script>
+  
   <script type="module" src="./main.js"></script>
 </body>
 </html>

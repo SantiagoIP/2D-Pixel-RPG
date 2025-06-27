@@ -12,8 +12,8 @@ export class InputHandler {
         // This is not affected by Caps Lock or Shift.
         this.keys[event.code] = true;
         
-        // Prevent browser default actions for keys we use
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Digit1', 'Digit2', 'Digit3'].includes(event.code)) {
+        // Prevent browser default actions for keys we use (Arrow keys only for movement)
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Digit1', 'Digit2', 'Digit3', 'KeyE', 'KeyF', 'KeyI', 'KeyJ', 'KeyC', 'KeyM', 'KeyB', 'KeyP', 'KeyN'].includes(event.code)) {
             event.preventDefault();
         }
     }
