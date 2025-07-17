@@ -379,6 +379,13 @@ export class AudioManager {
 
     dispose() {
         this.stopMusic();
+        
+        // Clear any pending music timeout to prevent memory leaks
+        if (this.musicTimeoutId) {
+            clearTimeout(this.musicTimeoutId);
+            this.musicTimeoutId = null;
+        }
+        
         if (this.audioContext) {
             this.audioContext.close().catch(e => console.error("Error closing AudioContext:", e));
             this.audioContext = null;
