@@ -893,7 +893,11 @@ export class UIManager {
         this.fadeOverlay.style.opacity = 1;
         const timerId = setTimeout(() => {
             this.fadeOverlay.style.opacity = 0;
-            this.removeTimer(timerId);
+            // Safely remove timer from tracking array
+            const index = this.activeTimers.indexOf(timerId);
+            if (index > -1) {
+                this.activeTimers.splice(index, 1);
+            }
         }, 50);
         this.activeTimers.push(timerId);
     }
@@ -908,7 +912,11 @@ export class UIManager {
         this.weaponSwitchOverlay.style.display = 'flex';
         const timerId = setTimeout(() => { 
             this.weaponSwitchOverlay.style.display = 'none'; 
-            this.removeTimer(timerId);
+            // Safely remove timer from tracking array
+            const index = this.activeTimers.indexOf(timerId);
+            if (index > -1) {
+                this.activeTimers.splice(index, 1);
+            }
         }, 700);
         this.activeTimers.push(timerId);
     }

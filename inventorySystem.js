@@ -405,11 +405,12 @@ export class InventorySystem {
                     displayText += ` (${item.quantity})`;
                 }
                 
-                slot.innerHTML = `
-                    <div style="text-align: center; font-size: 0.5em; color: white; padding: 2px;">
-                        ${displayText}
-                    </div>
-                `;
+                // Create secure DOM element instead of innerHTML
+                const slotContent = document.createElement('div');
+                slotContent.style.cssText = 'text-align: center; font-size: 0.5em; color: white; padding: 2px;';
+                slotContent.textContent = displayText; // Use textContent to prevent XSS
+                slot.innerHTML = ''; // Clear existing content
+                slot.appendChild(slotContent);
                 
                 // Color coding by type
                 const colors = {
