@@ -289,10 +289,72 @@ export class QuestManager {
         this.updateQuestCounts();
         console.log(`Completed quest: ${quest.title}`);
         
+        // Distribute rewards
+        this.distributeQuestRewards(quest);
+        
         // Show completion notification
         this.showQuestCompletionNotification(quest);
         
         return quest.rewards;
+    }
+
+    distributeQuestRewards(quest) {
+        if (!quest.rewards) return;
+        
+        const rewards = quest.rewards;
+        
+        // Give gold
+        if (rewards.gold && window.game) {
+            window.game.score += rewards.gold;
+            window.game.uiManager.playerGold = window.game.score;
+            window.game.uiManager.updateGold(window.game.score);
+            console.log(`Quest reward: +${rewards.gold} gold`);
+        }
+        
+        // Give experience
+        if (rewards.experience && window.game && window.game.player) {
+            const leveledUp = window.game.player.addExperience(rewards.experience);
+            console.log(`Quest reward: +${rewards.experience} experience`);
+            
+            if (leveledUp) {
+                window.game.handleLevelUp();
+            }
+        }
+        
+        // Give items
+        if (rewards.items && rewards.items.length > 0 && window.game && window.game.inventorySystem) {
+            rewards.items.forEach(rewardItem => {
+                const item = {
+                    id: `quest_reward_${rewardItem.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
+                    name: rewardItem.name,
+                    type: rewardItem.type || 'consumable',
+                    description: `Quest reward: ${rewardItem.description || rewardItem.name}`,
+                    quantity: rewardItem.quantity || 1,
+                    value: rewardItem.value || 0,
+                    stats: rewardItem.stats || {}
+                };
+                
+                window.game.inventorySystem.addItem(item);
+                console.log(`Quest reward: +${item.quantity} ${item.name}`);
+            });
+        }
+        
+        // Show reward notification
+        if (window.game && window.game.uiManager) {
+            let rewardText = 'Quest Completed! Rewards: ';
+            const rewardParts = [];
+            
+            if (rewards.gold) rewardParts.push(`${rewards.gold} gold`);
+            if (rewards.experience) rewardParts.push(`${rewards.experience} XP`);
+            if (rewards.items && rewards.items.length > 0) {
+                rewards.items.forEach(item => {
+                    rewardParts.push(`${item.quantity || 1} ${item.name}`);
+                });
+            }
+            
+            rewardText += rewardParts.join(', ');
+            window.game.uiManager.showNotification(rewardText, 'success');
+        }
     }
     
     showQuestCompletionNotification(quest) {

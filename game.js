@@ -94,12 +94,17 @@ export class Game {
         
         // Add starting items and equipment for testing
         this.inventorySystem.addItem({ name: 'Healing Potion', quantity: 3, type: 'consumable' });
+        this.inventorySystem.addItem({ name: 'Mana Potion', quantity: 2, type: 'consumable', manaRestore: 50 });
         this.inventorySystem.addItem({ name: 'Iron Ore', quantity: 5, type: 'material' });
         this.inventorySystem.addItem({ name: 'Wood', quantity: 8, type: 'material' });
         this.inventorySystem.addItem({ name: 'Leather', quantity: 3, type: 'material' });
         
         // Initialize with score as gold
         this.uiManager.updateGold(this.score);
+        this.uiManager.playerGold = this.score; // Sync playerGold with score
+
+        // Connect global game reference for shop system
+        window.game = this;
         
         // World setup
         this.world = new World(this.currentBiomeName);
@@ -194,6 +199,26 @@ export class Game {
                 // Music toggle
                 console.log("🎵 N key pressed - toggling music");
                 this.audioManager.toggleMusic();
+            } else if (e.code === 'KeyS' && e.ctrlKey) {
+                // Save game with Ctrl+S
+                e.preventDefault();
+                console.log("💾 Ctrl+S pressed - saving game");
+                this.saveGame();
+            } else if (e.code === 'KeyL' && e.ctrlKey) {
+                // Load game with Ctrl+L
+                e.preventDefault();
+                console.log("📁 Ctrl+L pressed - loading game");
+                this.loadGame();
+            } else if (e.code === 'F5') {
+                // Quick save with F5
+                e.preventDefault();
+                console.log("💾 F5 pressed - quick save");
+                this.saveGame();
+            } else if (e.code === 'F9') {
+                // Quick load with F9
+                e.preventDefault();
+                console.log("📁 F9 pressed - quick load");
+                this.loadGame();
             } else if (e.code === 'KeyE') {
                 // Interaction key - talk to NPCs, enter buildings, etc.
                 e.preventDefault(); // Prevent any default behavior
@@ -553,7 +578,8 @@ export class Game {
                         if (leveledUp) {
                             this.handleLevelUp();
                         }
-                        this.uiManager.updateScore(this.score); // Update UI
+                        this.uiManager.playerGold = this.score; // Sync playerGold with score
+        this.uiManager.updateScore(this.score); // Update UI
                         
                         // Handle quest objectives for monster kills
                         this.handleMonsterKillQuests(monster);
@@ -612,6 +638,7 @@ export class Game {
          this.checkThroneInteraction();
          // Update UI
          this.uiManager.updatePlayerHealth(this.player.currentHealth, this.player.maxHealth);
+        this.uiManager.updateMana(this.player.mana, this.player.maxMana);
         this.uiManager.updateExperience(this.player.level, this.player.experience, this.player.xpToNextLevel);
        this.uiManager.updatePlayerStats({
            maxHealth: this.player.maxHealth,
@@ -962,6 +989,198 @@ export class Game {
         };
         shake();
     }
+
+    saveGame() {
+        try {
+            const saveData = {
+                version: "1.0",
+                timestamp: Date.now(),
+                player: {
+                    level: this.player.level,
+                    experience: this.player.experience,
+                    xpToNextLevel: this.player.xpToNextLevel,
+                    currentHealth: this.player.currentHealth,
+                    maxHealth: this.player.maxHealth,
+                    mana: this.player.mana,
+                    maxMana: this.player.maxMana,
+                    position: {
+                        x: this.player.mesh.position.x,
+                        y: this.player.mesh.position.y,
+                        z: this.player.mesh.position.z
+                    },
+                    currentWeapon: this.player.currentWeapon,
+                    weaponLevel: this.player.weaponLevel
+                },
+                game: {
+                    score: this.score,
+                    currentBiomeName: this.currentBiomeName,
+                    discoveredRegions: Array.from(this.discoveredRegions)
+                },
+                inventory: {
+                    items: Array.from(this.inventorySystem.items.entries()),
+                    equipment: this.inventorySystem.equipment,
+                    gold: this.inventorySystem.gold
+                },
+                quests: {
+                    activeQuests: Array.from(this.questManager.activeQuests.entries()),
+                    completedQuests: Array.from(this.questManager.completedQuests.entries()),
+                    availableQuests: Array.from(this.questManager.availableQuests.entries())
+                }
+            };
+
+            localStorage.setItem('pixelScrollsRPG_save', JSON.stringify(saveData));
+            
+            if (this.uiManager) {
+                this.uiManager.showNotification('Game Saved!', 'success');
+            }
+            
+            console.log('Game saved successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to save game:', error);
+            if (this.uiManager) {
+                this.uiManager.showNotification('Save failed!', 'error');
+            }
+            return false;
+        }
+    }
+
+    loadGame() {
+        try {
+            const saveData = localStorage.getItem('pixelScrollsRPG_save');
+            if (!saveData) {
+                console.log('No save file found');
+                return false;
+            }
+
+            const data = JSON.parse(saveData);
+            
+            // Validate save data version
+            if (!data.version || data.version !== "1.0") {
+                console.warn('Save file version mismatch, loading anyway...');
+            }
+
+            // Restore player data
+            if (data.player) {
+                this.player.level = data.player.level || 1;
+                this.player.experience = data.player.experience || 0;
+                this.player.xpToNextLevel = data.player.xpToNextLevel || 20;
+                this.player.currentHealth = data.player.currentHealth || this.player.maxHealth;
+                this.player.maxHealth = data.player.maxHealth || 5;
+                this.player.mana = data.player.mana || 100;
+                this.player.maxMana = data.player.maxMana || 100;
+                this.player.currentWeapon = data.player.currentWeapon || 'sword';
+                this.player.weaponLevel = data.player.weaponLevel || 1;
+                
+                // Restore position
+                if (data.player.position) {
+                    this.player.mesh.position.set(
+                        data.player.position.x,
+                        data.player.position.y,
+                        data.player.position.z
+                    );
+                }
+            }
+
+            // Restore game data
+            if (data.game) {
+                this.score = data.game.score || 0;
+                this.uiManager.playerGold = this.score;
+                this.uiManager.updateGold(this.score);
+                
+                if (data.game.currentBiomeName) {
+                    this.currentBiomeName = data.game.currentBiomeName;
+                    // Recreate world with saved biome
+                    if (this.world) {
+                        this.world.dispose();
+                    }
+                    this.world = new World(this.currentBiomeName);
+                    this.scene.add(this.world.container);
+                    this.npcManager.loadNPCsForRegion(this.currentBiomeName);
+                }
+                
+                if (data.game.discoveredRegions) {
+                    this.discoveredRegions = new Set(data.game.discoveredRegions);
+                }
+            }
+
+            // Restore inventory
+            if (data.inventory) {
+                if (data.inventory.items) {
+                    this.inventorySystem.items.clear();
+                    data.inventory.items.forEach(([key, value]) => {
+                        this.inventorySystem.items.set(key, value);
+                    });
+                }
+                
+                if (data.inventory.equipment) {
+                    this.inventorySystem.equipment = data.inventory.equipment;
+                    this.inventorySystem.applyEquipmentBonuses();
+                }
+                
+                if (data.inventory.gold !== undefined) {
+                    this.inventorySystem.gold = data.inventory.gold;
+                }
+            }
+
+            // Restore quests
+            if (data.quests) {
+                if (data.quests.activeQuests) {
+                    this.questManager.activeQuests.clear();
+                    data.quests.activeQuests.forEach(([key, value]) => {
+                        this.questManager.activeQuests.set(key, value);
+                    });
+                }
+                
+                if (data.quests.completedQuests) {
+                    this.questManager.completedQuests.clear();
+                    data.quests.completedQuests.forEach(([key, value]) => {
+                        this.questManager.completedQuests.set(key, value);
+                    });
+                }
+                
+                if (data.quests.availableQuests) {
+                    this.questManager.availableQuests.clear();
+                    data.quests.availableQuests.forEach(([key, value]) => {
+                        this.questManager.availableQuests.set(key, value);
+                    });
+                }
+                
+                this.questManager.updateQuestCounts();
+            }
+
+            if (this.uiManager) {
+                this.uiManager.showNotification('Game Loaded!', 'success');
+            }
+            
+            console.log('Game loaded successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to load game:', error);
+            if (this.uiManager) {
+                this.uiManager.showNotification('Load failed!', 'error');
+            }
+            return false;
+        }
+    }
+
+    hasSaveFile() {
+        return localStorage.getItem('pixelScrollsRPG_save') !== null;
+    }
+
+    deleteSave() {
+        try {
+            localStorage.removeItem('pixelScrollsRPG_save');
+            if (this.uiManager) {
+                this.uiManager.showNotification('Save deleted!', 'info');
+            }
+            console.log('Save file deleted');
+            return true;
+        } catch (error) {
+            console.error('Failed to delete save:', error);
+            return false;
+        }
+    }
     travelToRegion(region) {
         // Implementation of travelToRegion method
         console.log("Traveling to region:", region);
@@ -1130,6 +1349,7 @@ export class Game {
                     if (quest.objectives.every(obj => obj.completed)) {
                         this.questManager.completeQuest(quest.id);
                         this.score += quest.reward || 10;
+                        this.uiManager.playerGold = this.score; // Sync playerGold with score
                         this.uiManager.updateGold(this.score);
                         
                         // Equipment quest rewards
@@ -1246,8 +1466,9 @@ export class Game {
                                 // Check if entire quest is complete
                                 if (quest.objectives.every(obj => obj.completed)) {
                                     this.questManager.completeQuest(quest.id);
-                                    this.score += quest.rewards.gold || 0;
-                                    this.uiManager.updateGold(this.score);
+                                            this.score += quest.rewards.gold || 0;
+        this.uiManager.playerGold = this.score; // Sync playerGold with score
+        this.uiManager.updateGold(this.score);
                                     console.log(`🎉 Quest completed: ${quest.title}`);
                                 }
                             }
