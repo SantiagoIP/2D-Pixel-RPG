@@ -2,6 +2,7 @@
 export class UIManager {
     constructor(container) {
         this.container = container;
+        this.activeTimers = []; // Track active timers for cleanup
         this.healthDisplayContainer = null;
         this.healthBarFill = null;
         this.healthText = null;
@@ -890,9 +891,11 @@ export class UIManager {
     fadeIn(duration = 1000) {
         this.fadeOverlay.style.transition = `opacity ${duration}ms`;
         this.fadeOverlay.style.opacity = 1;
-        setTimeout(() => {
+        const timerId = setTimeout(() => {
             this.fadeOverlay.style.opacity = 0;
+            this.removeTimer(timerId);
         }, 50);
+        this.activeTimers.push(timerId);
     }
     fadeOut(duration = 1000) {
         this.fadeOverlay.style.transition = `opacity ${duration}ms`;
@@ -903,7 +906,11 @@ export class UIManager {
         const names = { sword: 'SWORD', bow: 'BOW', staff: 'STAFF' };
         this.weaponSwitchOverlay.innerHTML = `<div>${icons[weapon] || '❓'}</div><div style='font-size:0.5em;'>${names[weapon] || weapon}</div>`;
         this.weaponSwitchOverlay.style.display = 'flex';
-        setTimeout(() => { this.weaponSwitchOverlay.style.display = 'none'; }, 700);
+        const timerId = setTimeout(() => { 
+            this.weaponSwitchOverlay.style.display = 'none'; 
+            this.removeTimer(timerId);
+        }, 700);
+        this.activeTimers.push(timerId);
     }
     showPauseMenu(onResume, onBestiary, onBiomes, onQuit) {
         this.pauseMenuOverlay.innerHTML = `
@@ -1141,5 +1148,23 @@ export class UIManager {
         
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
+    }
+
+    // Timer management methods for memory leak prevention
+    removeTimer(timerId) {
+        const index = this.activeTimers.indexOf(timerId);
+        if (index > -1) {
+            this.activeTimers.splice(index, 1);
+        }
+    }
+
+    clearAllTimers() {
+        this.activeTimers.forEach(timerId => clearTimeout(timerId));
+        this.activeTimers = [];
+    }
+
+    // Call this when destroying the UIManager instance
+    destroy() {
+        this.clearAllTimers();
     }
 }

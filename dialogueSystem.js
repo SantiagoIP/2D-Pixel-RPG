@@ -359,7 +359,7 @@ export class DialogueSystem {
         }
         
         // Handle number key selection
-        const keyNum = parseInt(event.key);
+        const keyNum = parseInt(event.key, 10);
         if (keyNum >= 1 && keyNum <= 9) {
             const buttons = document.querySelectorAll('#dialogue-options button');
             if (buttons[keyNum - 1]) {
