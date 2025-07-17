@@ -298,11 +298,11 @@ export class World {
         // North wall (behind the castle)
         addInvisibleWall(new THREE.Vector3(castleSize, wallHeight, wallThickness), new THREE.Vector3(0, wallHeight / 2, -halfSize - wallThickness));
         
-        // West wall (left side) - shorter to create an opening
-        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize * 0.6), new THREE.Vector3(-halfSize - wallThickness, wallHeight / 2, -castleSize * 0.2));
+        // West wall (left side) - much shorter and closer to castle to avoid blocking NPCs
+        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize * 0.4), new THREE.Vector3(-halfSize - wallThickness, wallHeight / 2, -castleSize * 0.3));
         
-        // East wall (right side) - shorter to create an opening  
-        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize * 0.6), new THREE.Vector3(halfSize + wallThickness, wallHeight / 2, -castleSize * 0.2));
+        // East wall (right side) - much shorter and closer to castle to avoid blocking NPCs
+        addInvisibleWall(new THREE.Vector3(wallThickness, wallHeight, castleSize * 0.4), new THREE.Vector3(halfSize + wallThickness, wallHeight / 2, -castleSize * 0.3));
         
         // Create the door trigger zone - much larger and more accessible
         const doorGeo = new THREE.PlaneGeometry(doorWidth, doorHeight);

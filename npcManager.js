@@ -414,9 +414,21 @@ export class NPCManager {
         for (const npc of regionNPCs) {
             this.scene.add(npc.mesh);
             this.activeNPCs.push(npc);
+            
+            // Debug: Validate NPC is properly added to scene
+            console.log(`🧙‍♂️ Added NPC ${npc.name} at position (${npc.position.x}, ${npc.position.y}, ${npc.position.z})`);
+            console.log(`🔍 NPC mesh in scene: ${npc.mesh.parent !== null}`);
         }
         
-        console.log(`Loaded ${regionNPCs.length} NPCs for region: ${regionName}`);
+        console.log(`✅ Loaded ${regionNPCs.length} NPCs for region: ${regionName}`);
+        
+        // Additional debugging: List all active NPCs
+        if (regionNPCs.length > 0) {
+            console.log("📍 Active NPC positions:");
+            this.activeNPCs.forEach(npc => {
+                console.log(`  - ${npc.name}: (${npc.position.x}, ${npc.position.y}, ${npc.position.z})`);
+            });
+        }
     }
     
     clearActiveNPCs() {

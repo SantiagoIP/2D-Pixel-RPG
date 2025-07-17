@@ -588,13 +588,13 @@ export class Game {
          // Update NPCs separately (they should persist regardless of waves)
          this.npcManager.update(deltaTime, this.player.mesh.position);
 
-         // Handle NPC interactions
-         const nearbyNPC = this.npcManager.getNearbyNPC(this.player.mesh.position);
-         if (nearbyNPC) {
-             this.uiManager.showInteractionPrompt(`Press 'E' to talk to ${nearbyNPC.name}`);
-         } else {
-             this.uiManager.hideInteractionPrompt();
-         }
+                 // Handle NPC interactions - use consistent range
+        const nearbyNPC = this.npcManager.getNearbyNPC(this.player.mesh.position, 3.5);
+        if (nearbyNPC) {
+            this.uiManager.showInteractionPrompt(`Press 'E' to talk to ${nearbyNPC.name}`);
+        } else {
+            this.uiManager.hideInteractionPrompt();
+        }
 
          // Update quest system and UI
          this.updateQuestSystem();
@@ -990,6 +990,18 @@ export class Game {
         // Debug: Track NPC loading
         console.log(`🧙‍♂️ Loading NPCs for ${this.currentBiomeName}`);
         
+        // Debug: Show obstacle positions for collision debugging
+        if (this.world && this.world.obstacles) {
+            console.log("🚧 Obstacle positions:");
+            this.world.obstacles.forEach((obstacle, index) => {
+                if (obstacle && obstacle.position) {
+                    const pos = obstacle.position;
+                    const size = obstacle.userData?.size || 'unknown';
+                    console.log(`  Obstacle ${index}: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}) size: ${size}`);
+                }
+            });
+        }
+        
         // Clear monsters and reset player position
         this.monsters.forEach(monster => {
             this.scene.remove(monster.mesh);
@@ -1040,7 +1052,8 @@ export class Game {
         // Check for nearby NPCs to talk to with increased range
         const nearbyNPC = this.npcManager.getNearbyNPC(playerPosition, 3.5);
         if (nearbyNPC) {
-            console.log(`✅ Found nearby NPC: ${nearbyNPC.name}`);
+            const distance = nearbyNPC.mesh.position.distanceTo(playerPosition);
+            console.log(`✅ Found nearby NPC: ${nearbyNPC.name} at distance: ${distance.toFixed(2)}`);
             
             // Show interaction feedback
             this.uiManager.showInteractionPrompt(`Talking to ${nearbyNPC.name}...`);

@@ -421,6 +421,10 @@ export class Player {
         // Obstacle collision check (simple AABB)
         for (const obstacle of obstacles) {
             if (!obstacle || !obstacle.userData || typeof obstacle.userData.size !== 'number') continue;
+            
+            // Skip collision with NPCs - they should not block player movement
+            if (obstacle.userData.isNPC) continue;
+            
             const obstaclePos = obstacle.position;
             const obstacleSize = obstacle.userData.size || 1; // Assuming size is stored or default
             const halfObstacleSize = obstacleSize / 2;
