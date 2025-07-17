@@ -336,21 +336,126 @@ export class InventorySystem {
         
         switch (item.type) {
             case 'consumable':
-                if (item.healing) {
-                    // Heal player - this would need to be connected to player object
-                    console.log(`Used ${item.name}, healing for ${item.healing}`);
-                    this.removeItem(itemId, 1);
-                    return { type: 'heal', amount: item.healing };
-                }
-                break;
+                return this.useConsumable(item, itemId);
             case 'weapon':
             case 'armor':
             case 'accessory':
                 this.equipItem(itemId);
-                break;
+                return { type: 'equipped', item: item.name };
         }
         
         return false;
+    }
+
+    useConsumable(item, itemId) {
+        let result = false;
+        
+        // Handle different consumable types
+        if (item.name === 'Health Potion' || item.healing) {
+            const healAmount = item.healing || 25; // Default heal amount
+            
+            // Check if player needs healing
+            if (window.game && window.game.player) {
+                const player = window.game.player;
+                if (player.currentHealth < player.maxHealth) {
+                    const actualHeal = Math.min(healAmount, player.maxHealth - player.currentHealth);
+                    player.currentHealth += actualHeal;
+                    
+                    // Create healing particle effect
+                    if (player.particleSystem) {
+                        player.particleSystem.createEffect('heal', player.mesh.position);
+                    }
+                    
+                    // Remove one item from inventory
+                    this.removeItem(itemId, 1);
+                    
+                    console.log(`Used ${item.name}, healed for ${actualHeal} HP`);
+                    
+                    // Show notification
+                    if (window.game && window.game.uiManager) {
+                        window.game.uiManager.showNotification(`Healed for ${actualHeal} HP!`, 'success');
+                    }
+                    
+                    result = { type: 'heal', amount: actualHeal };
+                } else {
+                    // Show notification if already at full health
+                    if (window.game && window.game.uiManager) {
+                        window.game.uiManager.showNotification('Already at full health!', 'info');
+                    }
+                    result = { type: 'heal', amount: 0, message: 'Already at full health' };
+                }
+            }
+        } else if (item.name === 'Mana Potion' || item.manaRestore) {
+            const manaAmount = item.manaRestore || 50; // Default mana restore
+            
+            if (window.game && window.game.player) {
+                const player = window.game.player;
+                // Check if player has mana system
+                if (player.mana !== undefined && player.maxMana !== undefined) {
+                    if (player.mana < player.maxMana) {
+                        const actualRestore = Math.min(manaAmount, player.maxMana - player.mana);
+                        player.mana += actualRestore;
+                        
+                        this.removeItem(itemId, 1);
+                        console.log(`Used ${item.name}, restored ${actualRestore} mana`);
+                        
+                        if (window.game && window.game.uiManager) {
+                            window.game.uiManager.showNotification(`Restored ${actualRestore} mana!`, 'success');
+                        }
+                        
+                        result = { type: 'mana', amount: actualRestore };
+                    } else {
+                        if (window.game && window.game.uiManager) {
+                            window.game.uiManager.showNotification('Mana already full!', 'info');
+                        }
+                        result = { type: 'mana', amount: 0, message: 'Mana already full' };
+                    }
+                } else {
+                    // No mana system available
+                    if (window.game && window.game.uiManager) {
+                        window.game.uiManager.showNotification('Cannot use mana potions yet!', 'error');
+                    }
+                    result = { type: 'mana', amount: 0, message: 'No mana system' };
+                }
+            }
+        } else if (item.buffType) {
+            // Handle buff potions
+            if (window.game && window.game.player) {
+                const player = window.game.player;
+                // Create buff from item properties
+                const buff = {
+                    id: item.buffType,
+                    name: item.name,
+                    icon: item.icon || '⚡',
+                    description: item.description || 'Temporary enhancement',
+                    duration: item.buffDuration || 30,
+                    effects: item.buffEffects || {}
+                };
+                
+                player.addBuff(buff);
+                this.removeItem(itemId, 1);
+                
+                console.log(`Used ${item.name}, applied buff: ${buff.name}`);
+                
+                if (window.game && window.game.uiManager) {
+                    window.game.uiManager.showNotification(`Applied ${buff.name}!`, 'success');
+                }
+                
+                result = { type: 'buff', buff: buff };
+            }
+        } else {
+            // Generic consumable with custom effects
+            console.log(`Used ${item.name}`);
+            this.removeItem(itemId, 1);
+            
+            if (window.game && window.game.uiManager) {
+                window.game.uiManager.showNotification(`Used ${item.name}!`, 'info');
+            }
+            
+            result = { type: 'generic', item: item.name };
+        }
+        
+        return result;
     }
     
     handleSlotClick(slotIndex) {

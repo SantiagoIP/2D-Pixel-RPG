@@ -73,6 +73,8 @@ export class UIManager {
             .health-text { font-size: 0.9em; margin-bottom: 5px; letter-spacing: 1px; }
             .bar-background { background-color: #212121; border: 2px solid #fffbe6; border-radius: 4px; padding: 2px; margin-bottom: 5px; }
             .health-bar-fill { height: 16px; width: 100%; background: linear-gradient(90deg, #ff5252, #ffb300); border-radius: 3px; transition: width 0.2s cubic-bezier(.68,-0.55,.27,1.55); box-shadow: 0 0 6px #ff5252a0; }
+            .mana-text { font-size: 0.9em; margin-bottom: 5px; letter-spacing: 1px; }
+            .mana-bar-fill { height: 16px; width: 100%; background: linear-gradient(90deg, #007bff, #6c757d); border-radius: 3px; transition: width 0.2s cubic-bezier(.68,-0.55,.27,1.55); box-shadow: 0 0 6px #007bffa0; }
             .level-text { font-size: 0.8em; color: #ffeb3b; margin-top: 5px; text-shadow: 2px 2px 0px #212121; }
             .xp-bar-fill { height: 8px; width: 0%; background: linear-gradient(90deg, #7e57c2, #00e5ff); border-radius: 2px; transition: width 0.2s cubic-bezier(.68,-0.55,.27,1.55); }
             .stats-display {
@@ -303,6 +305,121 @@ export class UIManager {
             .close-btn:hover {
                 background: #181818; color: #fffbe6; border: 3px solid #fffbe6;
             }
+            .shop-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+                font-family: 'Press Start 2P', cursive;
+            }
+            .shop-panel {
+                background: #2a2a2a;
+                border: 4px solid #8b4513;
+                border-radius: 8px;
+                padding: 20px;
+                max-width: 800px;
+                max-height: 80vh;
+                overflow-y: auto;
+                color: #fff;
+                box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            }
+            .shop-header {
+                text-align: center;
+                margin-bottom: 20px;
+                font-size: 16px;
+                color: #ffd700;
+            }
+            .shop-items-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            .shop-item-card {
+                background: #3a3a3a;
+                border: 2px solid #666;
+                border-radius: 4px;
+                padding: 10px;
+                cursor: pointer;
+                transition: all 0.2s;
+                text-align: center;
+            }
+            .shop-item-card.can-afford {
+                background: #4a4a4a;
+                border-color: #8b4513;
+            }
+            .shop-item-card.cannot-afford {
+                background: #3a3a3a;
+                border-color: #666;
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            .shop-item-card.purchased {
+                background: #212121;
+                border-color: #666;
+                opacity: 0.7;
+                cursor: default;
+            }
+            .shop-item-card .item-name {
+                font-size: 14px;
+                margin-bottom: 8px;
+            }
+            .shop-item-card .item-description {
+                font-size: 8px;
+                color: #ccc;
+                margin-bottom: 8px;
+            }
+            .shop-item-card .item-price {
+                font-size: 10px;
+                color: #4caf50;
+            }
+            .shop-item-card.cannot-afford .item-price {
+                color: #f44336;
+            }
+            .shop-item-card.purchased .item-price {
+                color: #666;
+            }
+            .shop-close-button {
+                width: 100%;
+                padding: 12px;
+                background: #666;
+                border: 2px solid #888;
+                color: white;
+                border-radius: 4px;
+                cursor: pointer;
+                font-family: 'Press Start 2P', cursive;
+                font-size: 10px;
+            }
+            .shop-close-button:hover {
+                background: #888;
+                border-color: #aaa;
+            }
+            .notification {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #2196f3;
+                color: white;
+                padding: 15px 25px;
+                border-radius: 4px;
+                font-family: 'Press Start 2P', cursive;
+                font-size: 10px;
+                z-index: 2000;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            }
+            .notification.success {
+                background: #4caf50;
+            }
+            .notification.error {
+                background: #f44336;
+            }
         `;
         document.head.appendChild(style);
         const uiOverlay = document.createElement('div');
@@ -322,6 +439,18 @@ export class UIManager {
         this.healthBarFill = document.createElement('div');
         this.healthBarFill.className = 'health-bar-fill';
         healthBarBackground.appendChild(this.healthBarFill);
+        
+        // Mana bar
+        this.manaText = document.createElement('div');
+        this.manaText.className = 'mana-text';
+        this.manaText.textContent = 'MP: ???/???';
+        const manaBarBackground = document.createElement('div');
+        manaBarBackground.className = 'bar-background';
+        manaBarBackground.style.width = '180px';
+        this.manaBarFill = document.createElement('div');
+        this.manaBarFill.className = 'mana-bar-fill';
+        manaBarBackground.appendChild(this.manaBarFill);
+        
         this.levelDisplay = document.createElement('div');
         this.levelDisplay.className = 'level-text';
         this.levelDisplay.textContent = 'Level: 1';
@@ -330,7 +459,7 @@ export class UIManager {
         this.xpBarFill = document.createElement('div');
         this.xpBarFill.className = 'xp-bar-fill';
         xpBarBackground.appendChild(this.xpBarFill);
-        this.healthDisplayContainer.append(this.healthText, healthBarBackground, this.levelDisplay, xpBarBackground);
+        this.healthDisplayContainer.append(this.healthText, healthBarBackground, this.manaText, manaBarBackground, this.levelDisplay, xpBarBackground);
         // --- Stats Display (below health) ---
         this.statsDisplay = document.createElement('div');
         this.statsDisplay.className = 'stats-display hud-container';
@@ -472,16 +601,21 @@ export class UIManager {
     }
     updatePlayerHealth(currentHealth, maxHealth) {
         if (this.healthBarFill && this.healthText) {
-            const healthPercentage = Math.max(0, (currentHealth / maxHealth) * 100);
-            // Animate HP bar flash if health changes
-            if (this.lastHealth !== undefined && currentHealth < this.lastHealth) {
-                this.healthBarFill.classList.remove('hp-flash');
-                void this.healthBarFill.offsetWidth; // Force reflow
-                this.healthBarFill.classList.add('hp-flash');
-            }
+            const healthPercentage = (currentHealth / maxHealth) * 100;
+            // Flash effect when health changes
+            this.healthBarFill.classList.remove('hp-flash');
+            void this.healthBarFill.offsetWidth; // Force reflow
+            this.healthBarFill.classList.add('hp-flash');
+            
             this.healthBarFill.style.width = `${healthPercentage}%`;
             this.healthText.innerHTML = `<span class='pixel-heart'></span> ${Math.max(0, currentHealth)} / ${maxHealth}`;
-            this.lastHealth = currentHealth;
+        }
+    }
+    updateMana(currentMana, maxMana) {
+        if (this.manaBarFill && this.manaText) {
+            const manaPercentage = (currentMana / maxMana) * 100;
+            this.manaBarFill.style.width = `${manaPercentage}%`;
+            this.manaText.innerHTML = `<span class='pixel-star'>✦</span> ${Math.floor(currentMana)} / ${maxMana}`;
         }
     }
     updateExperience(level, currentXP, xpToNextLevel) {
@@ -1161,6 +1295,188 @@ export class UIManager {
     clearAllTimers() {
         this.activeTimers.forEach(timerId => clearTimeout(timerId));
         this.activeTimers = [];
+    }
+
+    showShop(shopData, merchantName) {
+        // Create shop overlay
+        const shopOverlay = document.createElement('div');
+        shopOverlay.className = 'shop-overlay';
+        shopOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-family: 'Press Start 2P', cursive;
+        `;
+
+        const shopPanel = document.createElement('div');
+        shopPanel.style.cssText = `
+            background: #2a2a2a;
+            border: 4px solid #8b4513;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        `;
+
+        const header = document.createElement('div');
+        header.style.cssText = `
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 16px;
+            color: #ffd700;
+        `;
+        header.innerHTML = `
+            <div>🛒 ${merchantName}'s Shop</div>
+            <div style="font-size: 10px; margin-top: 8px; color: #ccc;">Your Gold: ${this.playerGold || 0}</div>
+        `;
+
+        const itemsGrid = document.createElement('div');
+        itemsGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        `;
+
+        // Populate shop items
+        if (shopData && shopData.items) {
+            shopData.items.forEach(item => {
+                const itemCard = document.createElement('div');
+                itemCard.style.cssText = `
+                    background: #3a3a3a;
+                    border: 2px solid #666;
+                    border-radius: 4px;
+                    padding: 10px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    text-align: center;
+                `;
+
+                const canAfford = (this.playerGold || 0) >= item.price;
+                itemCard.innerHTML = `
+                    <div style="font-size: 14px; margin-bottom: 8px;">${item.name}</div>
+                    <div style="font-size: 8px; color: #ccc; margin-bottom: 8px;">${item.description || 'A useful item'}</div>
+                    <div style="font-size: 10px; color: ${canAfford ? '#4caf50' : '#f44336'};">
+                        💰 ${item.price} Gold
+                    </div>
+                `;
+
+                if (canAfford) {
+                    itemCard.addEventListener('mouseenter', () => {
+                        itemCard.style.background = '#4a4a4a';
+                        itemCard.style.borderColor = '#8b4513';
+                    });
+                    
+                    itemCard.addEventListener('mouseleave', () => {
+                        itemCard.style.background = '#3a3a3a';
+                        itemCard.style.borderColor = '#666';
+                    });
+                    
+                    itemCard.addEventListener('click', () => {
+                        this.purchaseItem(item, shopOverlay);
+                    });
+                } else {
+                    itemCard.style.opacity = '0.5';
+                    itemCard.style.cursor = 'not-allowed';
+                }
+
+                itemsGrid.appendChild(itemCard);
+            });
+        }
+
+        const closeButton = document.createElement('button');
+        closeButton.textContent = 'Close Shop';
+        closeButton.style.cssText = `
+            width: 100%;
+            padding: 12px;
+            background: #666;
+            border: 2px solid #888;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+        `;
+        
+        closeButton.addEventListener('click', () => {
+            document.body.removeChild(shopOverlay);
+        });
+
+        shopPanel.appendChild(header);
+        shopPanel.appendChild(itemsGrid);
+        shopPanel.appendChild(closeButton);
+        shopOverlay.appendChild(shopPanel);
+        document.body.appendChild(shopOverlay);
+    }
+
+    purchaseItem(item, shopOverlay) {
+        if ((this.playerGold || 0) < item.price) {
+            this.showNotification('Not enough gold!', 'error');
+            return;
+        }
+
+        // Deduct gold
+        this.playerGold = (this.playerGold || 0) - item.price;
+        this.updateGold(this.playerGold);
+
+        // Add item to inventory (this would need to be connected to the inventory system)
+        if (window.game && window.game.inventorySystem) {
+            window.game.inventorySystem.addItem({
+                id: item.id || `shop_${item.name.toLowerCase().replace(/\s+/g, '_')}`,
+                name: item.name,
+                type: item.type || 'consumable',
+                description: item.description || 'Purchased from shop',
+                value: item.price,
+                quantity: item.quantity || 1,
+                stats: item.stats || {}
+            });
+        }
+
+        this.showNotification(`Purchased ${item.name}!`, 'success');
+        
+        // Close shop after purchase
+        setTimeout(() => {
+            if (shopOverlay.parentNode) {
+                document.body.removeChild(shopOverlay);
+            }
+        }, 1500);
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : '#2196f3'};
+            color: white;
+            padding: 15px 25px;
+            border-radius: 4px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            z-index: 2000;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        `;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                document.body.removeChild(notification);
+            }
+        }, 2000);
     }
 
     // Call this when destroying the UIManager instance

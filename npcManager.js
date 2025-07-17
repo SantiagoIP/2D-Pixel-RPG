@@ -286,11 +286,12 @@ export class NPCManager {
                     wanderRadius: 4,
                     shop: {
                         items: [
-                            { name: 'Health Potion', cost: 10 },
-                            { name: 'Magic Scroll', cost: 25 },
-                            { name: 'Iron Ore', cost: 8 },
-                            { name: 'Rope', cost: 5 },
-                            { name: 'Torch', cost: 2 }
+                            { name: 'Health Potion', price: 15, description: 'Restores 25 health points', type: 'consumable', healing: 25 },
+                            { name: 'Mana Potion', price: 20, description: 'Restores 50 mana points', type: 'consumable', manaRestore: 50 },
+                            { name: 'Magic Scroll', price: 25, description: 'Ancient magical knowledge', type: 'consumable' },
+                            { name: 'Iron Ore', price: 8, description: 'Useful for crafting weapons', type: 'material' },
+                            { name: 'Rope', price: 5, description: 'Strong hemp rope', type: 'material' },
+                            { name: 'Torch', price: 2, description: 'Lights the way in dark places', type: 'consumable' }
                         ]
                     },
                     quests: [
@@ -352,9 +353,11 @@ export class NPCManager {
                 {
                     shop: {
                         items: [
-                            { name: 'Waterskin', cost: 15 },
-                            { name: 'Scimitar', cost: 120 },
-                            { name: 'Desert Turban', cost: 40 }
+                            { name: 'Health Potion', price: 18, description: 'Desert healing elixir', type: 'consumable', healing: 25 },
+                            { name: 'Mana Potion', price: 25, description: 'Mystical desert brew', type: 'consumable', manaRestore: 50 },
+                            { name: 'Waterskin', price: 15, description: 'Essential for desert survival', type: 'consumable' },
+                            { name: 'Scimitar', price: 120, description: 'Sharp curved desert blade', type: 'weapon', stats: { attack: 8 } },
+                            { name: 'Desert Turban', price: 40, description: 'Protection from sun and sand', type: 'armor', stats: { defense: 2 } }
                         ]
                     },
                     region: 'DESERT'

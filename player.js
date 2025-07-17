@@ -151,6 +151,16 @@ export class Player {
         this.invulnerabilityDuration = 2.0; // Extended to 2 seconds for better recovery time
         this.invulnerabilityTimer = 0;
         
+        // Magic/Mana system
+        this.mana = 100;
+        this.maxMana = 100;
+        this.manaRegenRate = 10; // Mana per second
+        this.spellCosts = {
+            magic: 20, // Cost for magic attacks
+            heal: 30,  // Cost for self-heal spells
+            buff: 25   // Cost for buff spells
+        };
+        
         // Combat feedback
         this.lastHitTime = 0;
         this.hitFlashDuration = 0.1;
@@ -304,6 +314,17 @@ export class Player {
                 break;
             case 'staff':
                 attackType = 'magic';
+                // Check if player has enough mana for magic attack
+                if (this.mana < this.spellCosts.magic) {
+                    console.log('Not enough mana for magic attack!');
+                    // Show mana notification if UIManager is available
+                    if (window.game && window.game.uiManager) {
+                        window.game.uiManager.showNotification('Not enough mana!', 'error');
+                    }
+                    return; // Cancel the attack
+                }
+                // Consume mana for magic attack
+                this.mana -= this.spellCosts.magic;
                 damage = baseDamage * 2;
                 size = this.attackSize * 1.2;
                 lifetime = this.attackLifetime * 1.5;
@@ -483,6 +504,11 @@ export class Player {
         this.updateBuffs(deltaTime);
         this.updateCombatAnimations(deltaTime);
 
+        // Mana regeneration
+        if (this.mana < this.maxMana) {
+            this.mana = Math.min(this.maxMana, this.mana + (this.manaRegenRate * deltaTime));
+        }
+        
         if (this.isInvulnerable) {
             this.invulnerabilityTimer -= deltaTime;
             if (this.invulnerabilityTimer <= 0) {

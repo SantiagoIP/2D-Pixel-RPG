@@ -185,6 +185,16 @@ export class ParticleSystem {
                 gravity: 1,
                 drag: 0.92
             },
+            heal: {
+                count: 40,
+                colors: ['#00FF00', '#88FF88', '#CCFFCC', '#FFFFFF', '#90EE90'],
+                sizeRange: [4, 8],
+                speedRange: [1, 4],
+                lifeRange: [1.5, 2.5],
+                gravity: -1, // Rise upwards
+                drag: 0.98,
+                elevationRange: [0, 1] // Emit upwards in a cone
+            },
             npcInteract: {
                 count: 20,
                 colors: ['#88FF88', '#CCFFCC', '#FFFFFF'],
