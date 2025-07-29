@@ -13,6 +13,8 @@ import { DialogueSystem } from './dialogueSystem.js';
 import { QuestManager } from './questManager.js';
 import { InventorySystem } from './inventorySystem.js';
 import { CraftingSystem } from './craftingSystem.js';
+import { CharacterProgressionSystem } from './characterProgression.js';
+import { PerformanceOptimizer } from './performanceOptimizer.js';
 
 const RENDER_SCALE = 0.75; // Render at lower res for performance/style
 const PLAYER_INVULNERABILITY_DURATION = 1.0; // Seconds of invulnerability after taking damage
@@ -91,6 +93,8 @@ export class Game {
         this.inventorySystem = new InventorySystem();
         this.questManager = new QuestManager();
         this.craftingSystem = new CraftingSystem();
+        this.progressionSystem = new CharacterProgressionSystem();
+        this.performanceOptimizer = new PerformanceOptimizer(this);
         
         // Add starting items and equipment for testing
         this.inventorySystem.addItem({ name: 'Healing Potion', quantity: 3, type: 'consumable' });
@@ -946,6 +950,10 @@ export class Game {
     animate() {
         requestAnimationFrame(this.boundAnimate);
         const deltaTime = this.clock.getDelta();
+        
+        // Update performance monitoring
+        this.performanceOptimizer.updateFrameRate(deltaTime);
+        
         this.update(deltaTime);
         this.renderer.render(this.scene, this.camera);
     }

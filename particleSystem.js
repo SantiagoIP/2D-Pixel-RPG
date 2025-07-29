@@ -145,6 +145,9 @@ export class ParticleSystem {
 
         this.activeParticles = [];
         this.particlePool = [];
+        this.weather = null;
+        this.ambientEffects = new Map();
+        this.lightingEffects = new Map();
         
         // Enhanced effect configurations
         this.effectConfigs = {
@@ -300,5 +303,175 @@ export class ParticleSystem {
         this.scene.remove(this.points);
         this.geometry.dispose();
         this.material.dispose();
+        
+        // Clean up weather effects
+        this.stopWeatherEffect();
+    }
+    
+    // Enhanced Visual Effects
+    createMagicAura(position, color = '#9d4edd', duration = 5.0) {
+        for (let i = 0; i < 100; i++) {
+            setTimeout(() => {
+                this.emit('magicAura', position, {
+                    count: 1,
+                    colors: [color, '#ffffff', '#e0aaff'],
+                    sizeRange: [2, 6],
+                    speedRange: [1, 3],
+                    lifeRange: [3.0, 5.0],
+                    gravity: -1,
+                    drag: 0.99,
+                    elevationRange: [0, Math.PI * 2]
+                });
+            }, i * (duration * 1000 / 100));
+        }
+    }
+    
+    createCriticalHit(position) {
+        this.emit('criticalHit', position, {
+            count: 50,
+            colors: ['#FFD700', '#FFFF00', '#FF8C00', '#FF4500'],
+            sizeRange: [8, 15],
+            speedRange: [8, 15],
+            lifeRange: [0.8, 1.5],
+            gravity: 1,
+            drag: 0.92,
+            elevationRange: [-Math.PI/3, Math.PI/3]
+        });
+    }
+    
+    createEnchantmentEffect(position, enchantType = 'fire') {
+        const enchantConfigs = {
+            fire: {
+                colors: ['#FF4500', '#FF6347', '#FFD700', '#FF8C00'],
+                effect: 'swirl'
+            },
+            ice: {
+                colors: ['#87CEEB', '#B0E0E6', '#E0FFFF', '#FFFFFF'],
+                effect: 'crystal'
+            },
+            lightning: {
+                colors: ['#FFFF00', '#FFFFFF', '#87CEEB', '#9370DB'],
+                effect: 'spark'
+            },
+            poison: {
+                colors: ['#32CD32', '#ADFF2F', '#7FFF00', '#9ACD32'],
+                effect: 'bubble'
+            }
+        };
+        
+        const config = enchantConfigs[enchantType] || enchantConfigs.fire;
+        
+        for (let i = 0; i < 30; i++) {
+            this.emit('enchantment', position, {
+                count: 1,
+                colors: config.colors,
+                sizeRange: [3, 8],
+                speedRange: [2, 6],
+                lifeRange: [2.0, 4.0],
+                gravity: enchantType === 'fire' ? 0.5 : enchantType === 'ice' ? -0.5 : 0,
+                drag: 0.96,
+                elevationRange: [0, Math.PI * 2]
+            });
+        }
+    }
+    
+    createSpellCast(position, spellType = 'arcane') {
+        const spellConfigs = {
+            arcane: ['#9d4edd', '#c77dff', '#e0aaff', '#ffd6a5'],
+            fire: ['#ff006e', '#fb8500', '#ffbe0b', '#8ecae6'],
+            ice: ['#219ebc', '#8ecae6', '#caf0f8', '#ffffff'],
+            nature: ['#2d6a4f', '#40916c', '#52b788', '#74c69d'],
+            shadow: ['#2b2d42', '#8d99ae', '#edf2f4', '#d90429']
+        };
+        
+        const colors = spellConfigs[spellType] || spellConfigs.arcane;
+        
+        this.emit('spellCast', position, {
+            count: 80,
+            colors: colors,
+            sizeRange: [4, 12],
+            speedRange: [3, 10],
+            lifeRange: [1.5, 3.0],
+            gravity: 0,
+            drag: 0.95,
+            elevationRange: [0, Math.PI * 2]
+        });
+    }
+    
+    createWeatherEffect(type = 'rain', intensity = 1.0) {
+        this.weather = { type, intensity };
+        
+        const weatherConfigs = {
+            rain: {
+                count: Math.floor(200 * intensity),
+                colors: ['#4a90e2', '#87ceeb', '#b0e0e6'],
+                sizeRange: [1, 3],
+                speedRange: [8, 15],
+                lifeRange: [3.0, 6.0],
+                gravity: 15,
+                drag: 1.0,
+                elevationRange: [-Math.PI/2, -Math.PI/3]
+            },
+            snow: {
+                count: Math.floor(150 * intensity),
+                colors: ['#ffffff', '#f8f8ff', '#e6e6fa'],
+                sizeRange: [2, 6],
+                speedRange: [1, 4],
+                lifeRange: [8.0, 12.0],
+                gravity: 2,
+                drag: 0.99,
+                elevationRange: [-Math.PI/4, Math.PI/4]
+            }
+        };
+        
+        const config = weatherConfigs[type];
+        if (config) {
+            this.weatherInterval = setInterval(() => {
+                if (this.weather && window.game?.player?.mesh?.position) {
+                    const playerPos = window.game.player.mesh.position;
+                    const emitPos = {
+                        x: playerPos.x + (Math.random() - 0.5) * 50,
+                        y: playerPos.y + 20,
+                        z: playerPos.z + (Math.random() - 0.5) * 50
+                    };
+                    
+                    this.emit('weather', emitPos, config);
+                }
+            }, 500);
+        }
+    }
+    
+    stopWeatherEffect() {
+        this.weather = null;
+        if (this.weatherInterval) {
+            clearInterval(this.weatherInterval);
+            this.weatherInterval = null;
+        }
+    }
+    
+    createExplosion(position, size = 1.0, type = 'normal') {
+        const explosionConfigs = {
+            normal: {
+                colors: ['#ff4500', '#ff6347', '#ffa500', '#fff8dc'],
+                count: Math.floor(100 * size)
+            },
+            magic: {
+                colors: ['#9370db', '#dda0dd', '#e6e6fa', '#ffffff'],
+                count: Math.floor(120 * size)
+            }
+        };
+        
+        const config = explosionConfigs[type] || explosionConfigs.normal;
+        
+        this.emit('explosion', position, {
+            count: config.count,
+            colors: config.colors,
+            sizeRange: [4 * size, 15 * size],
+            speedRange: [8 * size, 20 * size],
+            lifeRange: [0.8, 2.0],
+            gravity: 3,
+            drag: 0.9,
+            elevationRange: [0, Math.PI]
+        });
     }
 }

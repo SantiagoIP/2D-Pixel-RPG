@@ -393,4 +393,206 @@ export class AudioManager {
         this.sounds = {};
         this.isInitialized = false;
     }
+    
+    // Enhanced Audio Features
+    playPositionalSound(soundType, position, listener, volume = 1.0) {
+        if (!this.isInitialized || !this.audioContext) return;
+        
+        const sound = this.sounds[soundType];
+        if (!sound) return;
+        
+        // Create positional audio
+        const source = this.audioContext.createBufferSource();
+        const panner = this.audioContext.createPanner();
+        const gainNode = this.audioContext.createGain();
+        
+        // Configure 3D audio
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'exponential';
+        panner.refDistance = 1;
+        panner.maxDistance = 50;
+        panner.rolloffFactor = 1;
+        
+        // Set positions
+        panner.positionX.setValueAtTime(position.x, this.audioContext.currentTime);
+        panner.positionY.setValueAtTime(position.y, this.audioContext.currentTime);
+        panner.positionZ.setValueAtTime(position.z, this.audioContext.currentTime);
+        
+        if (listener) {
+            this.audioContext.listener.positionX.setValueAtTime(listener.x, this.audioContext.currentTime);
+            this.audioContext.listener.positionY.setValueAtTime(listener.y, this.audioContext.currentTime);
+            this.audioContext.listener.positionZ.setValueAtTime(listener.z, this.audioContext.currentTime);
+        }
+        
+        // Set volume
+        gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+        
+        // Connect nodes
+        source.buffer = sound;
+        source.connect(panner);
+        panner.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        // Play sound
+        source.start();
+        
+        return { source, panner, gainNode };
+    }
+    
+    createAudioFade(audioNode, targetVolume, duration = 1.0) {
+        if (!this.audioContext || !audioNode.gain) return;
+        
+        const currentTime = this.audioContext.currentTime;
+        audioNode.gain.exponentialRampToValueAtTime(
+            Math.max(0.001, targetVolume), 
+            currentTime + duration
+        );
+    }
+    
+    playWithReverb(soundType, reverbAmount = 0.3, volume = 1.0) {
+        if (!this.isInitialized || !this.audioContext) return;
+        
+        const sound = this.sounds[soundType];
+        if (!sound) return;
+        
+        // Create reverb effect
+        const convolver = this.audioContext.createConvolver();
+        const dryGain = this.audioContext.createGain();
+        const wetGain = this.audioContext.createGain();
+        const outputGain = this.audioContext.createGain();
+        
+        // Create impulse response for reverb
+        this.createReverbImpulse(convolver, 2, 2, false);
+        
+        // Set levels
+        dryGain.gain.setValueAtTime(1 - reverbAmount, this.audioContext.currentTime);
+        wetGain.gain.setValueAtTime(reverbAmount, this.audioContext.currentTime);
+        outputGain.gain.setValueAtTime(volume, this.audioContext.currentTime);
+        
+        // Create and connect source
+        const source = this.audioContext.createBufferSource();
+        source.buffer = sound;
+        
+        // Connect audio graph
+        source.connect(dryGain);
+        source.connect(convolver);
+        
+        dryGain.connect(outputGain);
+        convolver.connect(wetGain);
+        wetGain.connect(outputGain);
+        
+        outputGain.connect(this.audioContext.destination);
+        
+        source.start();
+        return source;
+    }
+    
+    createReverbImpulse(convolver, duration, decay, reverse) {
+        const length = this.audioContext.sampleRate * duration;
+        const impulse = this.audioContext.createBuffer(2, length, this.audioContext.sampleRate);
+        
+        for (let channel = 0; channel < 2; channel++) {
+            const channelData = impulse.getChannelData(channel);
+            for (let i = 0; i < length; i++) {
+                const n = reverse ? length - i : i;
+                channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+            }
+        }
+        
+        convolver.buffer = impulse;
+    }
+    
+    playSequence(sounds, interval = 0.5) {
+        if (!Array.isArray(sounds)) return;
+        
+        sounds.forEach((soundType, index) => {
+            setTimeout(() => {
+                this.playSound(soundType);
+            }, index * interval * 1000);
+        });
+    }
+    
+    playRandomSound(soundArray, volume = 1.0) {
+        if (!Array.isArray(soundArray) || soundArray.length === 0) return;
+        
+        const randomSound = soundArray[Math.floor(Math.random() * soundArray.length)];
+        this.playSound(randomSound, volume);
+    }
+    
+    // Environmental audio
+    setEnvironmentalAudio(environment) {
+        const environmentSounds = {
+            forest: ['birds', 'wind', 'leaves'],
+            cave: ['drips', 'echo', 'bats'],
+            city: ['crowd', 'traffic', 'bells'],
+            dungeon: ['chains', 'torch', 'rats'],
+            beach: ['waves', 'seagulls', 'wind']
+        };
+        
+        const sounds = environmentSounds[environment];
+        if (sounds) {
+            sounds.forEach(soundType => {
+                this.playSound(soundType, 0.3); // Ambient volume
+            });
+        }
+    }
+    
+    // Dynamic music system
+    crossfadeMusic(newTrack, fadeTime = 2.0) {
+        if (!this.isInitialized) return;
+        
+        // Fade out current music
+        if (this.currentMusicSource) {
+            this.createAudioFade(this.currentMusicSource.gainNode, 0, fadeTime);
+            
+            setTimeout(() => {
+                if (this.currentMusicSource) {
+                    this.currentMusicSource.source.stop();
+                }
+            }, fadeTime * 1000);
+        }
+        
+        // Fade in new music
+        setTimeout(() => {
+            this.playMusic(newTrack);
+        }, fadeTime * 500); // Start new track halfway through fade
+    }
+    
+    // Audio feedback for game events
+    playLevelUpSound() {
+        this.playSequence(['chime', 'success', 'fanfare'], 0.3);
+    }
+    
+    playDeathSound() {
+        this.playWithReverb('death', 0.5, 0.8);
+    }
+    
+    playMagicSound(spellType = 'generic') {
+        const magicSounds = {
+            fire: ['fire_cast', 'flames'],
+            ice: ['ice_cast', 'freeze'],
+            lightning: ['lightning', 'thunder'],
+            healing: ['heal', 'blessing'],
+            generic: ['magic', 'spell']
+        };
+        
+        const sounds = magicSounds[spellType] || magicSounds.generic;
+        this.playRandomSound(sounds);
+    }
+    
+    playUISound(action) {
+        const uiSounds = {
+            click: 'ui_click',
+            hover: 'ui_hover',
+            open: 'ui_open',
+            close: 'ui_close',
+            error: 'ui_error',
+            success: 'ui_success'
+        };
+        
+        const soundType = uiSounds[action];
+        if (soundType) {
+            this.playSound(soundType, 0.7);
+        }
+    }
 }
