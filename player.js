@@ -98,7 +98,7 @@ export class Player {
         this.shadowMesh.position.set(0, 0.01, 0); // Slightly above ground
         this.mesh.add(this.shadowMesh);
 
-        // Movement and basic stats
+        // Movement and basic stats with enhanced responsiveness
         this.baseSpeed = 5;
         this.speed = this.baseSpeed;
         this.velocity = new THREE.Vector3();
@@ -106,16 +106,22 @@ export class Player {
         this.maxHealth = 5;
         this.currentHealth = this.maxHealth;
         
-        // Mana system for magic attacks
+        // Enhanced movement smoothing
+        this.moveSmoothing = 0.15;
+        this.lastMoveDirection = new THREE.Vector3();
+        this.isMoving = false;
+        this.movementTimer = 0;
+        
+        // Mana system for magic attacks with improved regeneration
         this.maxMana = 100;
         this.mana = this.maxMana;
-        this.manaRegenRate = 5; // Mana per second
+        this.manaRegenRate = 8; // Increased regeneration rate
         this.lastManaRegenTime = Date.now();
         
-        // Enhanced combat stats
-        this.baseAttackCooldown = 0.3; // Faster base cooldown for more dramatic differences
+        // Enhanced combat stats with better feedback
+        this.baseAttackCooldown = 0.25; // Slightly faster for better responsiveness
         this.attackCooldown = this.baseAttackCooldown;
-        this.weaponCooldownMultiplier = 1.0; // Track weapon-specific cooldown multiplier
+        this.weaponCooldownMultiplier = 1.0;
         this.lastAttackTime = -this.attackCooldown;
         this.baseAttackDamage = 1;
         this.attackDamage = this.baseAttackDamage;
@@ -130,7 +136,7 @@ export class Player {
         this.equipmentSpeedBonus = 0;
         this.equipmentHealthBonus = 0;
         
-        // New combat mechanics
+        // Enhanced combat mechanics
         this.currentWeapon = 'sword'; // sword, bow, staff
         this.weaponLevel = 1;
         this.criticalChance = 0.1; // 10% base crit chance
@@ -141,32 +147,53 @@ export class Player {
         this.isDodging = false;
         this.combatStance = 'normal'; // normal, aggressive, defensive
         
-        // Combat animations
+        // Enhanced combat animations with juice
         this.attackAnimationTime = 0;
         this.attackAnimationDuration = 0.2;
         this.isAttacking = false;
         this.originalScale = this.mesh.scale.clone();
+        this.hitShakeIntensity = 0;
+        this.hitShakeDuration = 0;
         
-        // RPG progression
+        // RPG progression with quality of life improvements
         this.level = 1;
         this.experience = 0;
         this.xpToNextLevel = 20;
         this.activeBuffs = {};
         this.isInvulnerable = false;
-        this.invulnerabilityDuration = 2.0; // Extended to 2 seconds for better recovery time
+        this.invulnerabilityDuration = 1.5; // Balanced for better gameplay flow
         this.invulnerabilityTimer = 0;
         
-        // Spell costs for mana system
+        // Auto-pickup system
+        this.autoPickupEnabled = true;
+        this.autoPickupRadius = 2.0; // Increased pickup radius
+        this.lastPickupTime = 0;
+        this.pickupCooldown = 0.1; // Prevent spam pickup
+        
+        // Enhanced spell costs with balance adjustments
         this.spellCosts = {
-            magic: 20, // Cost for magic attacks
-            heal: 30,  // Cost for self-heal spells
-            buff: 25   // Cost for buff spells
+            magic: 15, // Reduced cost for better gameplay flow
+            heal: 25,  // Reduced cost
+            buff: 20   // Reduced cost
         };
         
-        // Combat feedback
+        // Combat feedback with enhanced visual indicators
         this.lastHitTime = 0;
-        this.hitFlashDuration = 0.1;
-        this.interactionRadius = 1.5; // For picking up items
+        this.hitFlashDuration = 0.15;
+        this.interactionRadius = 2.0; // Increased for better usability
+        this.damageNumbers = []; // For floating damage numbers
+        
+        // Status effect indicators
+        this.statusEffects = {
+            poisoned: { active: false, duration: 0, damage: 0 },
+            burning: { active: false, duration: 0, damage: 0 },
+            frozen: { active: false, duration: 0, speedReduction: 0 },
+            blessed: { active: false, duration: 0, healRate: 0 }
+        };
+        
+        // Enhanced audio feedback
+        this.lastFootstepTime = 0;
+        this.footstepInterval = 0.4; // Time between footsteps
     }
 
     isAlive() {
