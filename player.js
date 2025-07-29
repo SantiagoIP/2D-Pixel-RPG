@@ -1,5 +1,4 @@
-// ✅ CACHE BUSTER - Player Movement Debug Version - ${Date.now()}
-console.log("🔧 Player.js loaded with movement debugging - Cache cleared:", Date.now());
+// Player class for RPG game
 
 import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 import { createPixelSprite, createAttackSprite } from './spriteUtils.js';
@@ -107,6 +106,12 @@ export class Player {
         this.maxHealth = 5;
         this.currentHealth = this.maxHealth;
         
+        // Mana system for magic attacks
+        this.maxMana = 100;
+        this.mana = this.maxMana;
+        this.manaRegenRate = 5; // Mana per second
+        this.lastManaRegenTime = Date.now();
+        
         // Enhanced combat stats
         this.baseAttackCooldown = 0.3; // Faster base cooldown for more dramatic differences
         this.attackCooldown = this.baseAttackCooldown;
@@ -151,10 +156,7 @@ export class Player {
         this.invulnerabilityDuration = 2.0; // Extended to 2 seconds for better recovery time
         this.invulnerabilityTimer = 0;
         
-        // Magic/Mana system
-        this.mana = 100;
-        this.maxMana = 100;
-        this.manaRegenRate = 10; // Mana per second
+        // Spell costs for mana system
         this.spellCosts = {
             magic: 20, // Cost for magic attacks
             heal: 30,  // Cost for self-heal spells

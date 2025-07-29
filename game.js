@@ -165,7 +165,7 @@ export class Game {
                 this.uiManager.showBestiary();
             } else if (e.code === 'KeyI') {
                 e.preventDefault();
-                console.log('🎒 I key pressed - toggling inventory');
+
                 if (this.inventorySystem && typeof this.inventorySystem.toggleInventory === 'function') {
                     this.inventorySystem.toggleInventory();
                 } else {
@@ -173,7 +173,7 @@ export class Game {
                 }
             } else if (e.code === 'KeyJ') {
                 e.preventDefault();
-                console.log('📖 J key pressed - toggling quest journal');
+
                 if (this.questManager && typeof this.questManager.toggleJournal === 'function') {
                     this.questManager.toggleJournal();
                 } else {
@@ -181,7 +181,7 @@ export class Game {
                 }
             } else if (e.code === 'KeyC') {
                 e.preventDefault();
-                console.log('🔨 C key pressed - toggling crafting');
+
                 if (this.craftingSystem && typeof this.craftingSystem.toggle === 'function') {
                     this.craftingSystem.toggle();
                 } else {
@@ -189,7 +189,7 @@ export class Game {
                 }
             } else if (e.code === 'KeyM') {
                 e.preventDefault();
-                console.log('🗺️ M key pressed - toggling world map');
+
                 if (this.uiManager && typeof this.uiManager.toggleMinimap === 'function') {
                     this.uiManager.toggleMinimap();
                 } else {
