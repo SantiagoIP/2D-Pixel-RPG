@@ -3,9 +3,12 @@ import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 export function setupScene() {
     const scene = new THREE.Scene();
     
+    // Set a simple color background first for debugging
+    scene.background = new THREE.Color(0x87CEEB);
+    
     // Create an enhanced gradient sky background with dynamic time effects
-    const skyGradient = createEnhancedSkyGradient();
-    scene.background = skyGradient;
+    // const skyGradient = createEnhancedSkyGradient();
+    // scene.background = skyGradient;
 
     // Use Orthographic Camera for 2D feel with better positioning
     const aspect = window.innerWidth / window.innerHeight;
@@ -34,6 +37,14 @@ export function setupScene() {
 
     // Add environmental effects
     addEnvironmentalEffects(scene);
+    
+    // Add a simple test cube to ensure rendering is working
+    const testGeometry = new THREE.BoxGeometry(2, 2, 2);
+    const testMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const testCube = new THREE.Mesh(testGeometry, testMaterial);
+    testCube.position.set(0, 1, 0);
+    scene.add(testCube);
+    console.log('🧪 Test cube added to scene at position (0, 1, 0)');
 
     return { scene, camera };
 }
