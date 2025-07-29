@@ -1306,6 +1306,11 @@ export class UIManager {
     }
 
     showShop(shopData, merchantName) {
+        // Sync playerGold with game score/gold
+        if (window.game) {
+            this.playerGold = window.game.score;
+        }
+        
         // Create shop overlay
         const shopOverlay = document.createElement('div');
         shopOverlay.className = 'shop-overlay';
@@ -1435,9 +1440,15 @@ export class UIManager {
 
         // Deduct gold
         this.playerGold = (this.playerGold || 0) - item.price;
+        
+        // Sync back to game score
+        if (window.game) {
+            window.game.score = this.playerGold;
+        }
+        
         this.updateGold(this.playerGold);
 
-        // Add item to inventory (this would need to be connected to the inventory system)
+        // Add item to inventory
         if (window.game && window.game.inventorySystem) {
             window.game.inventorySystem.addItem({
                 id: item.id || `shop_${item.name.toLowerCase().replace(/\s+/g, '_')}`,
