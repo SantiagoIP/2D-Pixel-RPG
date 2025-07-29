@@ -84,7 +84,8 @@ export class ParticleSystem {
         
         this.material = new THREE.ShaderMaterial({
             uniforms: {
-                pointTexture: { value: new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABFklEQVR42u3WMU4CQRTG8b8CCpTSUFPQ0BDQ0FKQ0BDQ0lCQUhBQLUKlpSgIqAjB3Z3dTCYzc6/5L5klM2/e3NnL7CIRl/oFncYp8AqcAgLAANgAK+BWGlisAAnYAVvD/IdfANrE2iXgCjwDO8A2sK0CXgA7wP6wP2wPj4AFsE4h0x9gAEwAP2gGKxqAAmwDzwS/XwDOgC/g8/YtA9g2sNJnAZgD3sC7rYwBC8AysL+aP/VbA7wA600s/wE4A3aBF3AVWAArk9mH8BH4AD4BN8ACGAHzwHlgGdgAdcDXRbYVwA/glvXpWsDW8B8/AlwA1sRif/xXgL8D2o2vAQvAClgBVsAC+Ac4AobBAFh3Gg4AAAAASUVORK5CYII=') }
+                pointTexture: { value: new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABFklEQVR42u3WMU4CQRTG8b8CCpTSUFPQ0BDQ0FKQ0BDQ0lCQUhBQLUKlpSgIqAjB3Z3dTCYzc6/5L5klM2/e3NnL7CIRl/oFncYp8AqcAgLAANgAK+BWGlisAAnYAVvD/IdfANrE2iXgCjwDO8A2sK0CXgA7wP6wP2wPj4AFsE4h0x9gAEwAP2gGKxqAAmwDzwS/XwDOgC/g8/YtA9g2sNJnAZgD3sC7rYwBC8AysL+aP/VbA7wA600s/wE4A3aBF3AVWAArk9mH8BH4AD4BN8ACGAHzwHlgGdgAdcDXRbYVwA/glvXpWsDW8B8/AlwA1sRif/xXgL8D2o2vAQvAClgBVsAC+Ac4AobBAFh3Gg4AAAAASUVORK5CYII=') },
+                time: { value: 0.0 }
             },
             vertexShader: `
                 attribute float size;
@@ -92,21 +93,46 @@ export class ParticleSystem {
                 attribute vec3 color;
                 varying float vAlpha;
                 varying vec3 vColor;
+                varying vec2 vUv;
+                uniform float time;
+                
                 void main() {
                     vAlpha = alpha;
                     vColor = color;
+                    vUv = uv;
+                    
                     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = size * (300.0 / -mvPosition.z);
+                    
+                    // Enhanced size calculation with breathing effect
+                    float breathe = 1.0 + 0.1 * sin(time * 3.0 + position.x + position.z);
+                    float finalSize = size * breathe * (300.0 / -mvPosition.z);
+                    
+                    gl_PointSize = finalSize;
                     gl_Position = projectionMatrix * mvPosition;
                 }
             `,
             fragmentShader: `
                 uniform sampler2D pointTexture;
+                uniform float time;
                 varying float vAlpha;
                 varying vec3 vColor;
+                
                 void main() {
-                    gl_FragColor = vec4(vColor, vAlpha);
-                    gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord);
+                    // Enhanced particle texture with glow effect
+                    vec2 center = gl_PointCoord - 0.5;
+                    float dist = length(center);
+                    
+                    // Create a soft circular gradient
+                    float mask = 1.0 - smoothstep(0.3, 0.5, dist);
+                    
+                    // Add subtle sparkle effect
+                    float sparkle = 1.0 + 0.3 * sin(time * 8.0 + dist * 20.0);
+                    
+                    // Enhanced glow with sparkle
+                    vec3 finalColor = vColor * sparkle;
+                    float finalAlpha = vAlpha * mask;
+                    
+                    gl_FragColor = vec4(finalColor, finalAlpha);
                 }
             `,
             blending: THREE.AdditiveBlending,
@@ -120,90 +146,87 @@ export class ParticleSystem {
         this.activeParticles = [];
         this.particlePool = [];
         
+        // Enhanced effect configurations
         this.effectConfigs = {
             levelUp: {
-                count: 150,
-                colors: ['#FFD700', '#FFEC8B', '#FFFFFF', '#FFA500', '#FF6B6B'],
-                sizeRange: [6, 15],
-                speedRange: [4, 9],
-                lifeRange: [1.5, 3.0],
-                gravity: 3,
-                drag: 0.98
+                count: 200,
+                colors: ['#FFD700', '#FFEC8B', '#FFFFFF', '#FFA500', '#FF6B6B', '#87CEEB'],
+                sizeRange: [8, 18],
+                speedRange: [5, 12],
+                lifeRange: [2.0, 4.0],
+                gravity: 2,
+                drag: 0.98,
+                elevationRange: [0, Math.PI]
             },
             monsterHit: {
-                count: 25,
-                colors: ['#FF4444', '#FF8888', '#FF6B6B', '#FFB6C1'],
-                sizeRange: [3, 7],
-                speedRange: [3, 6],
-                lifeRange: [0.4, 0.8],
-                gravity: 2,
-                drag: 0.95
+                count: 35,
+                colors: ['#FF4444', '#FF8888', '#FF6B6B', '#FFB6C1', '#8B0000'],
+                sizeRange: [4, 9],
+                speedRange: [4, 8],
+                lifeRange: [0.5, 1.2],
+                gravity: 2.5,
+                drag: 0.94,
+                elevationRange: [-Math.PI/4, Math.PI/4]
             },
             playerHit: {
-                count: 30,
-                colors: ['#FF0000', '#FF6666', '#FFFFFF', '#FFB6C1'],
-                sizeRange: [4, 8],
-                speedRange: [4, 7],
-                lifeRange: [0.5, 1.0],
-                gravity: 1.5,
-                drag: 0.96
-            },
-            monsterDefeat: {
-                count: 80,
-                colors: ['#AA0000', '#FF5555', '#FFFFFF', '#FFD700', '#FF6B6B'],
-                sizeRange: [5, 12],
-                speedRange: [5, 10],
-                lifeRange: [1.0, 2.0],
-                gravity: 3,
-                drag: 0.97
-            },
-            shrineActivate: {
-                count: 100,
-                colors: ['#BA55D3', '#DDA0DD', '#FFFFFF', '#9370DB', '#E6E6FA'],
-                sizeRange: [4, 10],
-                speedRange: [2, 5],
-                lifeRange: [2.0, 4.0],
-                gravity: -0.5, // Rise upwards
-                drag: 0.98,
-                elevationRange: [0, 1] // Emit upwards in a cone
-            },
-            criticalHit: {
-                count: 50,
-                colors: ['#FFFF00', '#FFAA00', '#FFFFFF', '#FFD700', '#FF6B6B'],
+                count: 40,
+                colors: ['#FF0000', '#FF6666', '#FFFFFF', '#FFB6C1', '#DC143C'],
                 sizeRange: [5, 10],
-                speedRange: [6, 12],
+                speedRange: [5, 9],
                 lifeRange: [0.8, 1.5],
-                gravity: 1.5,
-                drag: 0.97
+                gravity: 1.8,
+                drag: 0.95,
+                elevationRange: [-Math.PI/6, Math.PI/3]
             },
-            attackHit: {
-                count: 15,
-                colors: ['#FFFFFF', '#F0F0F0', '#DDDDDD'],
-                sizeRange: [2, 5],
-                speedRange: [2, 5],
-                lifeRange: [0.2, 0.5],
-                gravity: 1,
-                drag: 0.92
+            magicCast: {
+                count: 60,
+                colors: ['#9370DB', '#BA55D3', '#DA70D6', '#EE82EE', '#DDA0DD', '#FFFFFF'],
+                sizeRange: [6, 14],
+                speedRange: [3, 7],
+                lifeRange: [1.5, 2.5],
+                gravity: -1, // Negative gravity for floating effect
+                drag: 0.97,
+                elevationRange: [0, Math.PI/2]
             },
             heal: {
-                count: 40,
-                colors: ['#00FF00', '#88FF88', '#CCFFCC', '#FFFFFF', '#90EE90'],
-                sizeRange: [4, 8],
-                speedRange: [1, 4],
-                lifeRange: [1.5, 2.5],
-                gravity: -1, // Rise upwards
+                count: 50,
+                colors: ['#00FF00', '#32CD32', '#7CFC00', '#ADFF2F', '#FFFFFF'],
+                sizeRange: [5, 12],
+                speedRange: [2, 5],
+                lifeRange: [1.2, 2.0],
+                gravity: -0.5, // Slight upward movement
                 drag: 0.98,
-                elevationRange: [0, 1] // Emit upwards in a cone
+                elevationRange: [Math.PI/4, 3*Math.PI/4]
             },
-            npcInteract: {
-                count: 20,
-                colors: ['#88FF88', '#CCFFCC', '#FFFFFF'],
-                sizeRange: [2, 4],
-                speedRange: [1, 3],
-                lifeRange: [0.5, 1.0],
-                gravity: -0.5, // Rise up
-                drag: 0.95,
-                elevationRange: [0, 0.5]
+            treasure: {
+                count: 80,
+                colors: ['#FFD700', '#FFA500', '#FF6347', '#FFE4B5', '#FFFFFF'],
+                sizeRange: [7, 15],
+                speedRange: [3, 8],
+                lifeRange: [2.0, 3.5],
+                gravity: 1.5,
+                drag: 0.96,
+                elevationRange: [0, Math.PI]
+            },
+            questComplete: {
+                count: 120,
+                colors: ['#00BFFF', '#87CEEB', '#87CEFA', '#B0E0E6', '#FFFFFF', '#FFD700'],
+                sizeRange: [6, 16],
+                speedRange: [4, 10],
+                lifeRange: [2.5, 4.0],
+                gravity: 1,
+                drag: 0.97,
+                elevationRange: [0, Math.PI]
+            },
+            weaponPickup: {
+                count: 45,
+                colors: ['#C0C0C0', '#FFD700', '#FF6347', '#87CEEB'],
+                sizeRange: [5, 11],
+                speedRange: [3, 6],
+                lifeRange: [1.0, 2.0],
+                gravity: 2,
+                drag: 0.96,
+                elevationRange: [-Math.PI/6, Math.PI/2]
             }
         };
     }
@@ -226,6 +249,9 @@ export class ParticleSystem {
     }
 
     update(deltaTime) {
+        // Update time uniform for shader effects
+        this.material.uniforms.time.value += deltaTime;
+        
         let activeCount = 0;
         for (let i = 0; i < this.activeParticles.length; i++) {
             const particle = this.activeParticles[i];

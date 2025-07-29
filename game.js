@@ -138,9 +138,28 @@ export class Game {
         this.animate(); // Start render loop, but game logic is paused
         this.lastWeapon = this.player?.currentWeapon;
         
-        // Enhanced keyboard shortcuts
+        // Initialize enhanced systems
+        this.initAutoSave();
+        this.initPerformanceMonitoring();
+        this.gameStartTime = Date.now();
+        
+        // Enhanced keyboard shortcuts with save/load
         window.addEventListener('keydown', (e) => {
             // Audio will initialize automatically on user interaction
+            
+            // Save game with Ctrl+S
+            if (e.ctrlKey && e.code === 'KeyS') {
+                e.preventDefault();
+                this.saveGame();
+                return;
+            }
+            
+            // Load game with Ctrl+L
+            if (e.ctrlKey && e.code === 'KeyL') {
+                e.preventDefault();
+                this.loadGame();
+                return;
+            }
             
             // Toggle fullscreen with F11 or F key
             if (e.code === 'F11' || e.code === 'KeyF') {
@@ -1592,5 +1611,180 @@ export class Game {
         
         const randomIndex = Math.floor(Math.random() * weightedResources.length);
         return weightedResources[randomIndex];
+    }
+
+    // Enhanced save/load system for better player experience
+    saveGame() {
+        const gameState = {
+            version: '1.1.0',
+            timestamp: Date.now(),
+            player: {
+                level: this.player.level,
+                experience: this.player.experience,
+                xpToNextLevel: this.player.xpToNextLevel,
+                health: this.player.currentHealth,
+                maxHealth: this.player.maxHealth,
+                mana: this.player.mana,
+                maxMana: this.player.maxMana,
+                position: {
+                    x: this.player.mesh.position.x,
+                    y: this.player.mesh.position.y,
+                    z: this.player.mesh.position.z
+                },
+                currentWeapon: this.player.currentWeapon,
+                weaponLevel: this.player.weaponLevel
+            },
+            world: {
+                currentRegion: this.currentRegion,
+                discoveredRegions: Array.from(this.discoveredRegions),
+                hasRestedOnThrone: this.hasRestedOnThrone
+            },
+            inventory: this.inventorySystem.getAllItems(),
+            quests: this.questManager.getAllQuests(),
+            score: this.score,
+            playtime: Date.now() - (this.gameStartTime || Date.now())
+        };
+
+        try {
+            localStorage.setItem('pixelScrollsRPG_save', JSON.stringify(gameState));
+            this.uiManager.showNotification('Game Saved Successfully!', 'success');
+            console.log('Game saved successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to save game:', error);
+            this.uiManager.showNotification('Failed to save game', 'error');
+            return false;
+        }
+    }
+
+    loadGame() {
+        try {
+            const saveData = localStorage.getItem('pixelScrollsRPG_save');
+            if (!saveData) {
+                console.log('No save data found');
+                return false;
+            }
+
+            const gameState = JSON.parse(saveData);
+            
+            // Restore player state
+            if (gameState.player) {
+                this.player.level = gameState.player.level || 1;
+                this.player.experience = gameState.player.experience || 0;
+                this.player.xpToNextLevel = gameState.player.xpToNextLevel || 20;
+                this.player.currentHealth = gameState.player.health || this.player.maxHealth;
+                this.player.maxHealth = gameState.player.maxHealth || 5;
+                this.player.mana = gameState.player.mana || this.player.maxMana;
+                this.player.maxMana = gameState.player.maxMana || 100;
+                this.player.currentWeapon = gameState.player.currentWeapon || 'sword';
+                this.player.weaponLevel = gameState.player.weaponLevel || 1;
+                
+                if (gameState.player.position) {
+                    this.player.mesh.position.set(
+                        gameState.player.position.x || 0,
+                        gameState.player.position.y || this.player.size / 2,
+                        gameState.player.position.z || -25
+                    );
+                }
+            }
+
+            // Restore world state
+            if (gameState.world) {
+                this.currentRegion = gameState.world.currentRegion || 'GREEN_HILLS';
+                this.discoveredRegions = new Set(gameState.world.discoveredRegions || ['GREEN_HILLS']);
+                this.hasRestedOnThrone = gameState.world.hasRestedOnThrone || false;
+            }
+
+            // Restore inventory
+            if (gameState.inventory) {
+                this.inventorySystem.loadItems(gameState.inventory);
+            }
+
+            // Restore quests
+            if (gameState.quests) {
+                this.questManager.loadQuests(gameState.quests);
+            }
+
+            // Restore score
+            this.score = gameState.score || 0;
+            this.uiManager.updateGold(this.score);
+
+            this.uiManager.showNotification('Game Loaded Successfully!', 'success');
+            console.log('Game loaded successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to load game:', error);
+            this.uiManager.showNotification('Failed to load game', 'error');
+            return false;
+        }
+    }
+
+    // Auto-save functionality
+    initAutoSave() {
+        // Auto-save every 2 minutes
+        setInterval(() => {
+            if (this.isStarted && !this.isPaused && !this.isGameOver) {
+                this.saveGame();
+                console.log('Auto-save completed');
+            }
+        }, 120000); // 2 minutes
+    }
+
+    // Enhanced notification system
+    showFloatingText(text, position, color = '#FFD700', size = 1.0) {
+        const floatingText = {
+            text: text,
+            position: position.clone(),
+            color: color,
+            size: size,
+            life: 0,
+            maxLife: 2.0,
+            velocity: new THREE.Vector3(0, 2, 0)
+        };
+
+        if (!this.floatingTexts) {
+            this.floatingTexts = [];
+        }
+        this.floatingTexts.push(floatingText);
+    }
+
+    updateFloatingTexts(deltaTime) {
+        if (!this.floatingTexts) return;
+
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            const text = this.floatingTexts[i];
+            text.life += deltaTime;
+            text.position.add(text.velocity.clone().multiplyScalar(deltaTime));
+            text.velocity.multiplyScalar(0.95); // Slow down over time
+
+            if (text.life >= text.maxLife) {
+                this.floatingTexts.splice(i, 1);
+            }
+        }
+    }
+
+    // Enhanced performance monitoring
+    initPerformanceMonitoring() {
+        this.performanceStats = {
+            fps: 0,
+            frameTime: 0,
+            lastFrameTime: performance.now(),
+            frameCount: 0,
+            lastFPSUpdate: performance.now()
+        };
+    }
+
+    updatePerformanceStats() {
+        const now = performance.now();
+        this.performanceStats.frameTime = now - this.performanceStats.lastFrameTime;
+        this.performanceStats.lastFrameTime = now;
+        this.performanceStats.frameCount++;
+
+        // Update FPS every second
+        if (now - this.performanceStats.lastFPSUpdate >= 1000) {
+            this.performanceStats.fps = this.performanceStats.frameCount;
+            this.performanceStats.frameCount = 0;
+            this.performanceStats.lastFPSUpdate = now;
+        }
     }
 }
