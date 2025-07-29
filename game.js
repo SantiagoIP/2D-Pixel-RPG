@@ -24,9 +24,12 @@ export class Game {
         this.renderDiv = renderDiv;
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: false, // Keep pixel art sharp
-            alpha: true,
+            alpha: false,  // Changed to false to ensure proper background rendering
             preserveDrawingBuffer: false
         });
+        
+        // Set clear color to ensure renderer is visible
+        this.renderer.setClearColor(0x000000, 1);
         
         // Enable shadow mapping
         this.renderer.shadowMap.enabled = true;
@@ -266,21 +269,36 @@ export class Game {
         const width = this.renderDiv.clientWidth;
         const height = this.renderDiv.clientHeight;
         
+        console.log('🎮 Setting up renderer:', { width, height, renderDiv: this.renderDiv });
+        
         // Check if the renderDiv has proper dimensions
         if (width === 0 || height === 0) {
             // Set a default size
             this.renderDiv.style.width = '800px';
             this.renderDiv.style.height = '600px';
+            console.log('⚠️ RenderDiv had zero dimensions, setting default size');
         }
         
         const finalWidth = Math.max(width, 800);
         const finalHeight = Math.max(height, 600);
+        
+        console.log('📐 Final dimensions:', { finalWidth, finalHeight, scale: RENDER_SCALE });
         
         this.renderer.setSize(finalWidth * RENDER_SCALE, finalHeight * RENDER_SCALE, false);
         this.renderer.domElement.style.width = '100%';
         this.renderer.domElement.style.height = '100%';
         this.renderer.setPixelRatio(1);
         this.renderDiv.appendChild(this.renderer.domElement);
+        
+        console.log('✅ Canvas appended to renderDiv');
+        console.log('🎯 Canvas element:', this.renderer.domElement);
+        
+        // Force the canvas to be visible
+        this.renderer.domElement.style.position = 'absolute';
+        this.renderer.domElement.style.top = '0';
+        this.renderer.domElement.style.left = '0';
+        this.renderer.domElement.style.zIndex = '1';
+        
         // Handle window resize
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
     }

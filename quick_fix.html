@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel Scrolls - Quick Start</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Uncial+Antiqua&family=MedievalSharp&family=Press+Start+2P&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary-bg: #0d1117;
+      --secondary-bg: #161b22;
+      --tertiary-bg: #21262d;
+      --accent-primary: #f0a868;
+      --accent-secondary: #8b6f47;
+      --accent-tertiary: #d4af37;
+      --accent-quaternary: #9d4edd;
+      --text-primary: #f0f6fc;
+      --text-secondary: #e6d5a8;
+      --text-accent: #ffd700;
+      --border-primary: #30363d;
+      --border-accent: #d4af37;
+      --health-color: #dc3545;
+      --mana-color: #007bff;
+      --stamina-color: #28a745;
+      --xp-color: #ff6b35;
+      --shadow-primary: rgba(0, 0, 0, 0.8);
+      --shadow-secondary: rgba(212, 175, 55, 0.3);
+      --glow-primary: rgba(240, 168, 104, 0.4);
+      --glow-secondary: rgba(212, 175, 55, 0.6);
+      --glow-magic: rgba(157, 78, 221, 0.5);
+      --success-color: #4caf50;
+      --warning-color: #ff9800;
+      --error-color: #f44336;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: radial-gradient(ellipse at center, var(--primary-bg) 0%, #0a0c0f 70%, #000 100%);
+      color: white;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #game { 
+      width: 100vw; 
+      height: 100vh; 
+      display: block;
+      position: relative;
+    }
+
+    canvas { 
+      display: block; 
+      cursor: crosshair; 
+      transition: filter 0.3s ease;
+    }
+
+    canvas:hover {
+      filter: brightness(1.05) contrast(1.02);
+    }
+    
+    .controls {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 8px;
+      border: 2px solid var(--border-accent);
+      font-family: 'Cinzel', serif;
+      color: var(--text-primary);
+      text-shadow: 2px 2px 4px var(--shadow-primary);
+      box-shadow: 0 0 20px var(--shadow-secondary);
+      z-index: 1000;
+    }
+
+    .controls h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: var(--accent-primary);
+    }
+
+    .controls div {
+      font-size: 12px;
+      margin: 5px 0;
+    }
+
+    .key {
+      display: inline-block;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border-accent);
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-right: 8px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 10px;
+      color: var(--text-secondary);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    #quick-start-button {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      padding: 20px 40px;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-tertiary) 100%);
+      border: 3px solid var(--border-accent);
+      color: var(--primary-bg);
+      font-family: 'Cinzel', serif;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border-radius: 12px;
+      box-shadow: 
+        0 4px 15px rgba(0, 0, 0, 0.3),
+        0 0 50px var(--glow-secondary);
+      transition: all 0.3s ease;
+      z-index: 10000;
+    }
+    
+    #quick-start-button:hover {
+      transform: translate(-50%, -50%) scale(1.05);
+      box-shadow: 
+        0 8px 25px rgba(0, 0, 0, 0.4),
+        0 0 80px var(--glow-primary);
+    }
+    
+    #debug-info {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.9);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 10px;
+      border: 1px solid #0f0;
+      border-radius: 4px;
+      max-width: 300px;
+      z-index: 10001;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="level-up-bar"></div>
+  <div id="stat-display"></div>
+  <div id="buff-container"></div>
+  <div id="weapon-display"></div>
+  <div id="interaction-prompt"></div>
+  
+  <div class="controls">
+    <h3>🎮 Quick Controls</h3>
+    <div><span class="key">Arrow Keys</span> Move</div>
+    <div><span class="key">E</span> Interact</div>
+    <div><span class="key">SPACE</span> Attack</div>
+    <div><span class="key">I</span> Inventory</div>
+    <div><span class="key">J</span> Quests</div>
+    <div><span class="key">H</span> Help</div>
+  </div>
+  
+  <button id="quick-start-button" onclick="quickStart()">🚀 Quick Start Game</button>
+  
+  <div id="debug-info">
+    <strong>Debug Info:</strong><br>
+    <span id="debug-status">Waiting to start...</span>
+  </div>
+  
+  <script>
+    let gameStarted = false;
+    
+    function updateDebug(message) {
+      document.getElementById('debug-status').innerHTML = message;
+    }
+    
+    function quickStart() {
+      if (gameStarted) return;
+      gameStarted = true;
+      
+      updateDebug('Starting game...');
+      document.getElementById('quick-start-button').style.display = 'none';
+      
+      // Dispatch tutorial complete event
+      setTimeout(() => {
+        updateDebug('Skipping tutorial...');
+        window.dispatchEvent(new CustomEvent('tutorialComplete'));
+        
+        // Auto-select first biome after a short delay
+        setTimeout(() => {
+          updateDebug('Game should be starting...');
+          
+          // Try to find and click the biome selection if it appears
+          const biomeButtons = document.querySelectorAll('.biome-button');
+          if (biomeButtons.length > 0) {
+            updateDebug('Found biome selection, clicking first option...');
+            biomeButtons[0].click();
+          }
+        }, 500);
+      }, 100);
+    }
+    
+    // Monitor for canvas creation
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.tagName === 'CANVAS') {
+            updateDebug('Canvas detected! Size: ' + node.width + 'x' + node.height);
+          }
+        }
+      }
+    });
+    
+    observer.observe(document.getElementById('game'), { childList: true });
+  </script>
+  
+  <script type="module">
+    import { Game } from './game.js';
+    
+    const renderDiv = document.getElementById('game');
+    
+    if (!renderDiv) {
+      console.error("Fatal Error: game div not found.");
+      updateDebug('ERROR: Game div not found!');
+    } else {
+      updateDebug('Creating game instance...');
+      window.game = new Game(renderDiv);
+      updateDebug('Game instance created');
+    }
+  </script>
+</body>
+</html>
