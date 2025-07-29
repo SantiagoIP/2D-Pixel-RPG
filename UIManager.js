@@ -90,9 +90,23 @@ export class UIManager {
                     0 0 20px var(--ui-shadow-secondary),
                     inset 0 1px 3px rgba(255, 255, 255, 0.1);
                 padding: 15px;
-                backdrop-filter: blur(5px);
-                transition: all 0.3s ease;
+                backdrop-filter: blur(8px);
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 position: relative;
+                animation: hudFadeIn 0.8s ease-out;
+            }
+            
+            @keyframes hudFadeIn {
+                0% { 
+                    opacity: 0; 
+                    transform: translateY(-20px); 
+                    filter: blur(10px); 
+                }
+                100% { 
+                    opacity: 1; 
+                    transform: translateY(0); 
+                    filter: blur(0); 
+                }
             }
 
             .hud-container::before {
@@ -170,15 +184,22 @@ export class UIManager {
             }
 
             .health-bar-fill { 
-                height: 20px; width: 100%; 
+                height: 22px; width: 100%; 
                 background: linear-gradient(90deg, #dc3545, #ff6b6b, #ff9f43);
-                border-radius: 6px; 
-                transition: width 0.3s cubic-bezier(.68,-0.55,.27,1.55);
+                border-radius: 8px; 
+                transition: all 0.4s cubic-bezier(.68,-0.55,.27,1.55);
                 box-shadow: 
-                    0 0 8px rgba(220, 53, 69, 0.6),
-                    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+                    0 0 12px rgba(220, 53, 69, 0.7),
+                    0 2px 8px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 3px rgba(255, 255, 255, 0.4);
                 position: relative;
                 overflow: hidden;
+                animation: healthPulse 2s ease-in-out infinite alternate;
+            }
+            
+            @keyframes healthPulse {
+                0% { box-shadow: 0 0 12px rgba(220, 53, 69, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(255, 255, 255, 0.4); }
+                100% { box-shadow: 0 0 18px rgba(220, 53, 69, 0.9), 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 3px rgba(255, 255, 255, 0.5); }
             }
 
             .health-bar-fill::after {
@@ -199,15 +220,22 @@ export class UIManager {
             }
 
             .mana-bar-fill { 
-                height: 20px; width: 100%; 
+                height: 22px; width: 100%; 
                 background: linear-gradient(90deg, #007bff, #40a9ff, #69c0ff);
-                border-radius: 6px; 
-                transition: width 0.3s cubic-bezier(.68,-0.55,.27,1.55);
+                border-radius: 8px; 
+                transition: all 0.4s cubic-bezier(.68,-0.55,.27,1.55);
                 box-shadow: 
-                    0 0 8px rgba(0, 123, 255, 0.6),
-                    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+                    0 0 12px rgba(0, 123, 255, 0.7),
+                    0 2px 8px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 3px rgba(255, 255, 255, 0.4);
                 position: relative;
                 overflow: hidden;
+                animation: manaPulse 2.5s ease-in-out infinite alternate;
+            }
+            
+            @keyframes manaPulse {
+                0% { box-shadow: 0 0 12px rgba(0, 123, 255, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(255, 255, 255, 0.4); }
+                100% { box-shadow: 0 0 18px rgba(0, 123, 255, 0.9), 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 3px rgba(255, 255, 255, 0.5); }
             }
 
             .mana-bar-fill::after {
@@ -594,23 +622,58 @@ export class UIManager {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.85);
+                background: linear-gradient(45deg, 
+                    rgba(0, 0, 0, 0.9) 0%, 
+                    rgba(13, 17, 23, 0.95) 50%, 
+                    rgba(0, 0, 0, 0.9) 100%);
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                z-index: 1000;
-                font-family: 'Press Start 2P', cursive;
+                z-index: 1500;
+                font-family: 'Cinzel', serif;
+                backdrop-filter: blur(15px);
+                animation: shopOverlayFadeIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+            
+            @keyframes shopOverlayFadeIn {
+                0% { 
+                    opacity: 0; 
+                    backdrop-filter: blur(0px);
+                    transform: scale(0.95);
+                }
+                100% { 
+                    opacity: 1; 
+                    backdrop-filter: blur(15px);
+                    transform: scale(1);
+                }
             }
             .shop-panel {
-                background: #2a2a2a;
-                border: 4px solid #8b4513;
-                border-radius: 8px;
-                padding: 20px;
-                max-width: 800px;
-                max-height: 80vh;
+                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                border: 4px solid var(--ui-border-accent);
+                border-radius: 20px;
+                padding: 35px;
+                max-width: 900px;
+                max-height: 85vh;
                 overflow-y: auto;
-                color: #fff;
-                box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+                color: var(--ui-text-primary);
+                box-shadow: 
+                    0 0 40px rgba(0, 0, 0, 0.9),
+                    0 0 80px rgba(212, 175, 55, 0.3),
+                    inset 0 2px 8px rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                animation: shopPanelSlideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                position: relative;
+            }
+            
+            @keyframes shopPanelSlideIn {
+                0% { 
+                    opacity: 0; 
+                    transform: translateY(-50px) scale(0.9);
+                }
+                100% { 
+                    opacity: 1; 
+                    transform: translateY(0) scale(1);
+                }
             }
             .shop-header {
                 text-align: center;
@@ -625,17 +688,50 @@ export class UIManager {
                 margin-bottom: 20px;
             }
             .shop-item-card {
-                background: #3a3a3a;
-                border: 2px solid #666;
-                border-radius: 4px;
-                padding: 10px;
+                background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+                border: 3px solid #666;
+                border-radius: 12px;
+                padding: 16px;
                 cursor: pointer;
-                transition: all 0.2s;
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 text-align: center;
+                position: relative;
+                overflow: hidden;
+                box-shadow: 
+                    0 4px 12px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            }
+            
+            .shop-item-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+                transition: left 0.5s ease;
+            }
+            
+            .shop-item-card:hover::before {
+                left: 100%;
             }
             .shop-item-card.can-afford {
-                background: #4a4a4a;
-                border-color: #8b4513;
+                background: linear-gradient(135deg, #4a4a4a 0%, #3d3d3d 100%);
+                border-color: var(--ui-border-accent);
+                box-shadow: 
+                    0 6px 18px rgba(0, 0, 0, 0.4),
+                    0 0 12px rgba(212, 175, 55, 0.3),
+                    inset 0 1px 3px rgba(255, 255, 255, 0.15);
+            }
+            
+            .shop-item-card.can-afford:hover {
+                transform: translateY(-5px) scale(1.02);
+                border-color: var(--ui-accent-tertiary);
+                box-shadow: 
+                    0 8px 25px rgba(0, 0, 0, 0.5),
+                    0 0 20px rgba(212, 175, 55, 0.5),
+                    inset 0 1px 5px rgba(255, 255, 255, 0.2);
             }
             .shop-item-card.cannot-afford {
                 background: #3a3a3a;
