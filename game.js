@@ -150,6 +150,18 @@ export class Game {
         this.initPerformanceMonitoring();
         this.gameStartTime = Date.now();
         
+        // Debug mode - bypass tutorial and biome selection
+        if (window.location.search.includes('debug=true')) {
+            console.log('🔧 Debug mode enabled - bypassing tutorial and biome selection');
+            setTimeout(() => {
+                this.tutorialComplete = true;
+                this.waitingForTutorial = false;
+                this.selectedBiome = 'GREEN_HILLS';
+                this.startGame();
+                console.log('🎮 Game started in debug mode');
+            }, 100);
+        }
+        
         // Enhanced keyboard shortcuts with save/load
         window.addEventListener('keydown', (e) => {
             // Audio will initialize automatically on user interaction

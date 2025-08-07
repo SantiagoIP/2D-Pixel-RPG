@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Game Debug</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #game {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background: #333;
+        }
+        #debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #0f0;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10000;
+        }
+        .debug-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #444;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .debug-section h3 {
+            margin: 0 0 10px 0;
+            color: #0f0;
+            font-size: 14px;
+        }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .warning { color: #ff0; }
+        .info { color: #0ff; }
+        button {
+            margin: 5px;
+            padding: 5px 10px;
+            background: #444;
+            color: #fff;
+            border: 1px solid #666;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+        #buff-container { position: fixed; top: 10px; left: 10px; }
+        #active-quest-container { position: fixed; top: 100px; left: 10px; }
+        #dialogue-container { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); }
+        #minimap-container { position: fixed; top: 10px; right: 420px; }
+    </style>
+</head>
+<body>
+    <!-- Required UI elements -->
+    <div id="buff-container"></div>
+    <div id="active-quest-container"></div>
+    <div id="dialogue-container"></div>
+    <div id="minimap-container"></div>
+    
+    <div id="game"></div>
+    
+    <div id="debug-panel">
+        <h2>Game Debug Panel</h2>
+        
+        <div class="debug-section">
+            <h3>Initialization Status</h3>
+            <div id="init-status"></div>
+        </div>
+        
+        <div class="debug-section">
+            <h3>Game State</h3>
+            <div id="game-state"></div>
+        </div>
+        
+        <div class="debug-section">
+            <h3>Rendering Status</h3>
+            <div id="render-status"></div>
+        </div>
+        
+        <div class="debug-section">
+            <h3>Controls</h3>
+            <button onclick="startGameManually()">Start Game Manually</button>
+            <button onclick="selectBiome('GREEN_HILLS')">Select Green Hills</button>
+            <button onclick="testRender()">Test Render</button>
+            <button onclick="checkRenderer()">Check Renderer</button>
+        </div>
+        
+        <div class="debug-section">
+            <h3>Console Log</h3>
+            <div id="console-log" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+    
+    <script type="module">
+        const initStatus = document.getElementById('init-status');
+        const gameState = document.getElementById('game-state');
+        const renderStatus = document.getElementById('render-status');
+        const consoleLog = document.getElementById('console-log');
+        
+        // Override console methods to capture logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addConsoleEntry(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            consoleLog.appendChild(entry);
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog(...args);
+            addConsoleEntry(args.join(' '), 'info');
+        };
+        
+        console.error = function(...args) {
+            originalError(...args);
+            addConsoleEntry('ERROR: ' + args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn(...args);
+            addConsoleEntry('WARN: ' + args.join(' '), 'warning');
+        };
+        
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            addConsoleEntry(`ERROR: ${event.message} at ${event.filename}:${event.lineno}:${event.colno}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', (event) => {
+            addConsoleEntry(`UNHANDLED PROMISE: ${event.reason}`, 'error');
+        });
+        
+        let game = null;
+        let THREE = null; // Store THREE globally
+        
+        function updateStatus(element, message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = message;
+            element.appendChild(entry);
+        }
+        
+        async function initGame() {
+            try {
+                updateStatus(initStatus, 'Loading Three.js...', 'info');
+                THREE = await import('https://unpkg.com/three@0.152.2/build/three.module.js'); // Store THREE globally
+                window.THREE = THREE; // Make it available globally
+                updateStatus(initStatus, '✓ Three.js loaded', 'success');
+                
+                updateStatus(initStatus, 'Loading Game module...', 'info');
+                const { Game } = await import('./game.js');
+                updateStatus(initStatus, '✓ Game module loaded', 'success');
+                
+                updateStatus(initStatus, 'Creating game instance...', 'info');
+                const gameDiv = document.getElementById('game');
+                game = new Game(gameDiv);
+                window.game = game;
+                updateStatus(initStatus, '✓ Game instance created', 'success');
+                
+                // Check renderer
+                if (game.renderer) {
+                    updateStatus(initStatus, '✓ Renderer created', 'success');
+                    updateStatus(renderStatus, `Canvas size: ${game.renderer.domElement.width}x${game.renderer.domElement.height}`, 'info');
+                    updateStatus(renderStatus, `DOM element appended: ${game.renderer.domElement.parentNode === gameDiv}`, 'info');
+                } else {
+                    updateStatus(initStatus, '✗ Renderer not created', 'error');
+                }
+                
+                // Check scene
+                if (game.scene) {
+                    updateStatus(initStatus, '✓ Scene created', 'success');
+                    updateStatus(renderStatus, `Scene children: ${game.scene.children.length}`, 'info');
+                } else {
+                    updateStatus(initStatus, '✗ Scene not created', 'error');
+                }
+                
+                // Start update loop
+                setInterval(updateGameState, 500);
+                
+                return true;
+            } catch (error) {
+                updateStatus(initStatus, `✗ Failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+                return false;
+            }
+        }
+        
+        function updateGameState() {
+            if (!game) return;
+            
+            gameState.innerHTML = '';
+            updateStatus(gameState, `Started: ${game.isStarted}`, game.isStarted ? 'success' : 'warning');
+            updateStatus(gameState, `Paused: ${game.isPaused}`, 'info');
+            updateStatus(gameState, `Game Over: ${game.isGameOver}`, 'info');
+            updateStatus(gameState, `Tutorial Complete: ${game.tutorialComplete}`, game.tutorialComplete ? 'success' : 'warning');
+            updateStatus(gameState, `Waiting for Tutorial: ${game.waitingForTutorial}`, 'info');
+            updateStatus(gameState, `Current Biome: ${game.currentBiomeName}`, 'info');
+            
+            if (game.player) {
+                updateStatus(gameState, `Player Health: ${game.player.currentHealth}/${game.player.maxHealth}`, 'info');
+                updateStatus(gameState, `Player Position: (${game.player.mesh.position.x.toFixed(1)}, ${game.player.mesh.position.y.toFixed(1)}, ${game.player.mesh.position.z.toFixed(1)})`, 'info');
+            }
+            
+            updateStatus(gameState, `Monsters: ${game.monsters.length}`, 'info');
+            updateStatus(gameState, `Scene Objects: ${game.scene.children.length}`, 'info');
+        }
+        
+        window.startGameManually = function() {
+            if (!game) {
+                alert('Game not loaded yet!');
+                return;
+            }
+            
+            // Bypass tutorial
+            game.tutorialComplete = true;
+            game.waitingForTutorial = false;
+            
+            // If biome selection is showing, close it
+            if (game.uiManager.biomeSelectOverlay) {
+                game.uiManager.biomeSelectOverlay.style.display = 'none';
+            }
+            
+            // Start the game
+            game.startGame();
+            console.log('Game started manually');
+        };
+        
+        window.selectBiome = function(biomeId) {
+            if (!game) {
+                alert('Game not loaded yet!');
+                return;
+            }
+            
+            // Trigger tutorial complete first
+            window.dispatchEvent(new CustomEvent('tutorialComplete'));
+            
+            // Wait a bit then select biome
+            setTimeout(() => {
+                if (game.uiManager.biomeSelectOverlay) {
+                    // Find and click the biome
+                    const cards = game.uiManager.biomeSelectOverlay.querySelectorAll('.biome-card');
+                    cards.forEach(card => {
+                        if (card.textContent.includes(biomeId.replace(/_/g, ' '))) {
+                            card.click();
+                        }
+                    });
+                }
+            }, 100);
+        };
+        
+        window.testRender = function() {
+            if (!game || !game.renderer) {
+                alert('Renderer not available!');
+                return;
+            }
+            
+            // Force a render
+            game.renderer.render(game.scene, game.camera);
+            console.log('Forced render complete');
+            
+            // Take a screenshot
+            const canvas = game.renderer.domElement;
+            const dataURL = canvas.toDataURL();
+            console.log('Canvas data URL length:', dataURL.length);
+            
+            // Check if canvas has content
+            const ctx = document.createElement('canvas').getContext('2d');
+            ctx.drawImage(canvas, 0, 0);
+            const imageData = ctx.getImageData(0, 0, 1, 1);
+            console.log('First pixel RGBA:', Array.from(imageData.data));
+        };
+        
+        window.checkRenderer = function() {
+            if (!game || !game.renderer) {
+                alert('Renderer not available!');
+                return;
+            }
+            
+            const r = game.renderer;
+            console.log('Renderer info:');
+            console.log('- Size:', r.getSize(new THREE.Vector2()));
+            console.log('- Pixel ratio:', r.getPixelRatio());
+            console.log('- Clear color:', r.getClearColor(new THREE.Color()));
+            console.log('- Clear alpha:', r.getClearAlpha());
+            console.log('- DOM parent:', r.domElement.parentNode);
+            console.log('- DOM style:', r.domElement.style.cssText);
+            console.log('- Computed style display:', window.getComputedStyle(r.domElement).display);
+            console.log('- Computed style visibility:', window.getComputedStyle(r.domElement).visibility);
+        };
+        
+        // Initialize the game
+        initGame();
+    </script>
+</body>
+</html>
