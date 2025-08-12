@@ -36,11 +36,6 @@ export class UIManager {
         this.bestiaryOverlay = null;
         this.biomeSelectOverlay = null;
         this.activeQuestDisplay = null;
-        this.buffContainer = document.getElementById('buff-container');
-        this.activeQuestContainer = document.getElementById('active-quest-container');
-        this.dialogueContainer = document.getElementById('dialogue-container');
-        this.minimapContainer = document.getElementById('minimap-container');
-        this.minimap = document.getElementById('minimap');
         this.initUI();
     }
     initUI() {
@@ -854,6 +849,16 @@ export class UIManager {
         this.buffContainer = document.createElement('div');
         this.buffContainer.className = 'buff-container';
         bottomLeftContainer.appendChild(this.buffContainer);
+
+        // --- Gold/Currency Display ---
+        this.scoreDisplay = document.createElement('div');
+        this.scoreDisplay.className = 'hud-container';
+        this.scoreDisplay.style.marginTop = '10px';
+        this.scoreDisplay.style.fontFamily = "'Press Start 2P', monospace";
+        this.scoreDisplay.style.fontSize = '0.9em';
+        this.scoreDisplay.textContent = 'Gold: 0';
+        bottomLeftContainer.appendChild(this.scoreDisplay);
+
         uiOverlay.appendChild(bottomLeftContainer);
         // --- Top-Center HUD (Wave & Biome) ---
         const topCenterContainer = document.createElement('div');

@@ -181,7 +181,7 @@ export class Game {
             }
             
             // Toggle fullscreen with F11 or F key
-            if (e.code === 'F11' || e.code === 'KeyF') {
+            if (e.code === 'F11') {
                 if (this.renderer.domElement.requestFullscreen) {
                     this.renderer.domElement.requestFullscreen();
                 } else if (this.renderer.domElement.mozRequestFullScreen) {
@@ -1049,14 +1049,14 @@ export class Game {
 
     saveGame() {
         try {
-            const saveData = {
-                version: "1.0",
+            const gameState = {
+                version: '1.1.0',
                 timestamp: Date.now(),
                 player: {
                     level: this.player.level,
                     experience: this.player.experience,
                     xpToNextLevel: this.player.xpToNextLevel,
-                    currentHealth: this.player.currentHealth,
+                    health: this.player.currentHealth,
                     maxHealth: this.player.maxHealth,
                     mana: this.player.mana,
                     maxMana: this.player.maxMana,
@@ -1068,36 +1068,24 @@ export class Game {
                     currentWeapon: this.player.currentWeapon,
                     weaponLevel: this.player.weaponLevel
                 },
-                game: {
-                    score: this.score,
-                    currentBiomeName: this.currentBiomeName,
-                    discoveredRegions: Array.from(this.discoveredRegions)
+                world: {
+                    currentRegion: this.currentRegion,
+                    discoveredRegions: Array.from(this.discoveredRegions),
+                    hasRestedOnThrone: this.hasRestedOnThrone
                 },
-                inventory: {
-                    items: Array.from(this.inventorySystem.items.entries()),
-                    equipment: this.inventorySystem.equipment,
-                    gold: this.inventorySystem.gold
-                },
-                quests: {
-                    activeQuests: Array.from(this.questManager.activeQuests.entries()),
-                    completedQuests: Array.from(this.questManager.completedQuests.entries()),
-                    availableQuests: Array.from(this.questManager.availableQuests.entries())
-                }
+                inventory: this.inventorySystem.getAllItems(),
+                quests: this.questManager.getAllQuests(),
+                score: this.score,
+                playtime: Date.now() - (this.gameStartTime || Date.now())
             };
 
-            localStorage.setItem('pixelScrollsRPG_save', JSON.stringify(saveData));
-            
-            if (this.uiManager) {
-                this.uiManager.showNotification('Game Saved!', 'success');
-            }
-            
+            localStorage.setItem('pixelScrollsRPG_save', JSON.stringify(gameState));
+            this.uiManager.showNotification('Game Saved Successfully!', 'success');
             console.log('Game saved successfully');
             return true;
         } catch (error) {
             console.error('Failed to save game:', error);
-            if (this.uiManager) {
-                this.uiManager.showNotification('Save failed!', 'error');
-            }
+            this.uiManager.showNotification('Failed to save game', 'error');
             return false;
         }
     }
@@ -1106,117 +1094,60 @@ export class Game {
         try {
             const saveData = localStorage.getItem('pixelScrollsRPG_save');
             if (!saveData) {
-                console.log('No save file found');
+                console.log('No save data found');
                 return false;
             }
 
-            const data = JSON.parse(saveData);
+            const gameState = JSON.parse(saveData);
             
-            // Validate save data version
-            if (!data.version || data.version !== "1.0") {
-                console.warn('Save file version mismatch, loading anyway...');
-            }
-
-            // Restore player data
-            if (data.player) {
-                this.player.level = data.player.level || 1;
-                this.player.experience = data.player.experience || 0;
-                this.player.xpToNextLevel = data.player.xpToNextLevel || 20;
-                this.player.currentHealth = data.player.currentHealth || this.player.maxHealth;
-                this.player.maxHealth = data.player.maxHealth || 5;
-                this.player.mana = data.player.mana || 100;
-                this.player.maxMana = data.player.maxMana || 100;
-                this.player.currentWeapon = data.player.currentWeapon || 'sword';
-                this.player.weaponLevel = data.player.weaponLevel || 1;
+            // Restore player state
+            if (gameState.player) {
+                this.player.level = gameState.player.level || 1;
+                this.player.experience = gameState.player.experience || 0;
+                this.player.xpToNextLevel = gameState.player.xpToNextLevel || 20;
+                this.player.currentHealth = gameState.player.health || this.player.maxHealth;
+                this.player.maxHealth = gameState.player.maxHealth || 5;
+                this.player.mana = gameState.player.mana || this.player.maxMana;
+                this.player.maxMana = gameState.player.maxMana || 100;
+                this.player.currentWeapon = gameState.player.currentWeapon || 'sword';
+                this.player.weaponLevel = gameState.player.weaponLevel || 1;
                 
-                // Restore position
-                if (data.player.position) {
+                if (gameState.player.position) {
                     this.player.mesh.position.set(
-                        data.player.position.x,
-                        data.player.position.y,
-                        data.player.position.z
+                        gameState.player.position.x || 0,
+                        gameState.player.position.y || this.player.size / 2,
+                        gameState.player.position.z || -25
                     );
                 }
             }
 
-            // Restore game data
-            if (data.game) {
-                this.score = data.game.score || 0;
-                this.uiManager.playerGold = this.score;
-                this.uiManager.updateGold(this.score);
-                
-                if (data.game.currentBiomeName) {
-                    this.currentBiomeName = data.game.currentBiomeName;
-                    // Recreate world with saved biome
-                    if (this.world) {
-                        this.world.dispose();
-                    }
-                    this.world = new World(this.currentBiomeName);
-                    this.scene.add(this.world.container);
-                    this.npcManager.loadNPCsForRegion(this.currentBiomeName);
-                }
-                
-                if (data.game.discoveredRegions) {
-                    this.discoveredRegions = new Set(data.game.discoveredRegions);
-                }
+            // Restore world state
+            if (gameState.world) {
+                this.currentRegion = gameState.world.currentRegion || 'GREEN_HILLS';
+                this.discoveredRegions = new Set(gameState.world.discoveredRegions || ['GREEN_HILLS']);
+                this.hasRestedOnThrone = gameState.world.hasRestedOnThrone || false;
             }
 
             // Restore inventory
-            if (data.inventory) {
-                if (data.inventory.items) {
-                    this.inventorySystem.items.clear();
-                    data.inventory.items.forEach(([key, value]) => {
-                        this.inventorySystem.items.set(key, value);
-                    });
-                }
-                
-                if (data.inventory.equipment) {
-                    this.inventorySystem.equipment = data.inventory.equipment;
-                    this.inventorySystem.applyEquipmentBonuses();
-                }
-                
-                if (data.inventory.gold !== undefined) {
-                    this.inventorySystem.gold = data.inventory.gold;
-                }
+            if (gameState.inventory) {
+                this.inventorySystem.loadItems(gameState.inventory);
             }
 
             // Restore quests
-            if (data.quests) {
-                if (data.quests.activeQuests) {
-                    this.questManager.activeQuests.clear();
-                    data.quests.activeQuests.forEach(([key, value]) => {
-                        this.questManager.activeQuests.set(key, value);
-                    });
-                }
-                
-                if (data.quests.completedQuests) {
-                    this.questManager.completedQuests.clear();
-                    data.quests.completedQuests.forEach(([key, value]) => {
-                        this.questManager.completedQuests.set(key, value);
-                    });
-                }
-                
-                if (data.quests.availableQuests) {
-                    this.questManager.availableQuests.clear();
-                    data.quests.availableQuests.forEach(([key, value]) => {
-                        this.questManager.availableQuests.set(key, value);
-                    });
-                }
-                
-                this.questManager.updateQuestCounts();
+            if (gameState.quests) {
+                this.questManager.loadQuests(gameState.quests);
             }
 
-            if (this.uiManager) {
-                this.uiManager.showNotification('Game Loaded!', 'success');
-            }
-            
+            // Restore score
+            this.score = gameState.score || 0;
+            this.uiManager.updateGold(this.score);
+
+            this.uiManager.showNotification('Game Loaded Successfully!', 'success');
             console.log('Game loaded successfully');
             return true;
         } catch (error) {
             console.error('Failed to load game:', error);
-            if (this.uiManager) {
-                this.uiManager.showNotification('Load failed!', 'error');
-            }
+            this.uiManager.showNotification('Failed to load game', 'error');
             return false;
         }
     }
@@ -1651,111 +1582,7 @@ export class Game {
         return weightedResources[randomIndex];
     }
 
-    // Enhanced save/load system for better player experience
-    saveGame() {
-        const gameState = {
-            version: '1.1.0',
-            timestamp: Date.now(),
-            player: {
-                level: this.player.level,
-                experience: this.player.experience,
-                xpToNextLevel: this.player.xpToNextLevel,
-                health: this.player.currentHealth,
-                maxHealth: this.player.maxHealth,
-                mana: this.player.mana,
-                maxMana: this.player.maxMana,
-                position: {
-                    x: this.player.mesh.position.x,
-                    y: this.player.mesh.position.y,
-                    z: this.player.mesh.position.z
-                },
-                currentWeapon: this.player.currentWeapon,
-                weaponLevel: this.player.weaponLevel
-            },
-            world: {
-                currentRegion: this.currentRegion,
-                discoveredRegions: Array.from(this.discoveredRegions),
-                hasRestedOnThrone: this.hasRestedOnThrone
-            },
-            inventory: this.inventorySystem.getAllItems(),
-            quests: this.questManager.getAllQuests(),
-            score: this.score,
-            playtime: Date.now() - (this.gameStartTime || Date.now())
-        };
 
-        try {
-            localStorage.setItem('pixelScrollsRPG_save', JSON.stringify(gameState));
-            this.uiManager.showNotification('Game Saved Successfully!', 'success');
-            console.log('Game saved successfully');
-            return true;
-        } catch (error) {
-            console.error('Failed to save game:', error);
-            this.uiManager.showNotification('Failed to save game', 'error');
-            return false;
-        }
-    }
-
-    loadGame() {
-        try {
-            const saveData = localStorage.getItem('pixelScrollsRPG_save');
-            if (!saveData) {
-                console.log('No save data found');
-                return false;
-            }
-
-            const gameState = JSON.parse(saveData);
-            
-            // Restore player state
-            if (gameState.player) {
-                this.player.level = gameState.player.level || 1;
-                this.player.experience = gameState.player.experience || 0;
-                this.player.xpToNextLevel = gameState.player.xpToNextLevel || 20;
-                this.player.currentHealth = gameState.player.health || this.player.maxHealth;
-                this.player.maxHealth = gameState.player.maxHealth || 5;
-                this.player.mana = gameState.player.mana || this.player.maxMana;
-                this.player.maxMana = gameState.player.maxMana || 100;
-                this.player.currentWeapon = gameState.player.currentWeapon || 'sword';
-                this.player.weaponLevel = gameState.player.weaponLevel || 1;
-                
-                if (gameState.player.position) {
-                    this.player.mesh.position.set(
-                        gameState.player.position.x || 0,
-                        gameState.player.position.y || this.player.size / 2,
-                        gameState.player.position.z || -25
-                    );
-                }
-            }
-
-            // Restore world state
-            if (gameState.world) {
-                this.currentRegion = gameState.world.currentRegion || 'GREEN_HILLS';
-                this.discoveredRegions = new Set(gameState.world.discoveredRegions || ['GREEN_HILLS']);
-                this.hasRestedOnThrone = gameState.world.hasRestedOnThrone || false;
-            }
-
-            // Restore inventory
-            if (gameState.inventory) {
-                this.inventorySystem.loadItems(gameState.inventory);
-            }
-
-            // Restore quests
-            if (gameState.quests) {
-                this.questManager.loadQuests(gameState.quests);
-            }
-
-            // Restore score
-            this.score = gameState.score || 0;
-            this.uiManager.updateGold(this.score);
-
-            this.uiManager.showNotification('Game Loaded Successfully!', 'success');
-            console.log('Game loaded successfully');
-            return true;
-        } catch (error) {
-            console.error('Failed to load game:', error);
-            this.uiManager.showNotification('Failed to load game', 'error');
-            return false;
-        }
-    }
 
     // Auto-save functionality
     initAutoSave() {
