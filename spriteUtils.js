@@ -201,7 +201,7 @@ const spriteData = {
         pixelGridSize: 16
     },
 
-    castle: { // Enhanced castle with more detail
+    castle_old_remove_me: { // Enhanced castle with more detail
         pixels: [
             1,1,1,1,0,0,1,1,1,1,0,0,1,1,1,1, // Battlements
             2,2,2,2,0,0,2,2,2,2,0,0,2,2,2,2,

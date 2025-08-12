@@ -38,13 +38,7 @@ export function setupScene() {
     // Add environmental effects
     addEnvironmentalEffects(scene);
     
-    // Add a simple test cube to ensure rendering is working
-    const testGeometry = new THREE.BoxGeometry(2, 2, 2);
-    const testMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const testCube = new THREE.Mesh(testGeometry, testMaterial);
-    testCube.position.set(0, 1, 0);
-    scene.add(testCube);
-    console.log('🧪 Test cube added to scene at position (0, 1, 0)');
+    // Debug cube removed (use ?debug=true to add temporary debug visuals if needed)
 
     return { scene, camera };
 }
