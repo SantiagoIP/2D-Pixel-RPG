@@ -1,4 +1,4 @@
-// Simple Web Audio API manager
+// Enhanced Web Audio API manager with volume controls, biome-specific music, and richer SFX
 export class AudioManager {
     constructor() {
         this.audioContext = null;
@@ -9,6 +9,20 @@ export class AudioManager {
         this.isInitialized = false;
         this.musicEnabled = false;
         this.userHasInteracted = false;
+        
+        // Volume controls (0.0 - 1.0)
+        this.masterVolume = 0.7;
+        this.musicVolume = 0.4;
+        this.sfxVolume = 0.6;
+        
+        // Gain nodes for volume control
+        this.masterGain = null;
+        this.musicGain = null;
+        this.sfxGain = null;
+        
+        // Current biome for music selection
+        this.currentBiome = 'GREEN_HILLS';
+        this.currentTrackName = null;
         
         // Bind and setup user interaction detection
         this.handleUserInteraction = this.handleUserInteraction.bind(this);
@@ -64,6 +78,19 @@ export class AudioManager {
             console.log("🎵 AudioContext state:", this.audioContext.state);
             
             if (this.audioContext.state === 'running') {
+                // Create gain node hierarchy: source -> sfx/music -> master -> destination
+                this.masterGain = this.audioContext.createGain();
+                this.masterGain.gain.value = this.masterVolume;
+                this.masterGain.connect(this.audioContext.destination);
+                
+                this.musicGain = this.audioContext.createGain();
+                this.musicGain.gain.value = this.musicVolume;
+                this.musicGain.connect(this.masterGain);
+                
+                this.sfxGain = this.audioContext.createGain();
+                this.sfxGain.gain.value = this.sfxVolume;
+                this.sfxGain.connect(this.masterGain);
+                
                 this.preloadSounds();
                 this.isInitialized = true;
                 this.musicEnabled = true;
@@ -82,16 +109,36 @@ export class AudioManager {
     preloadSounds() {
         if (!this.audioContext) return;
         
-        console.log("🎵 Preloading sounds...");
+        console.log("🎵 Preloading enhanced sounds...");
         
-        // Generate simple sounds programmatically
-        this.sounds['playerAttack'] = this.createSynthSound(440, 0.05, 'square', 0.5);
-        this.sounds['monsterHit'] = this.createNoiseSound(0.15, 0.2);
-        this.sounds['playerHit'] = this.createNoiseSound(0.25, 0.4);
-        this.sounds['levelUp'] = this.createSynthSound(523.25, 0.5, 'triangle', 0.6);
+        // Combat sounds
+        this.sounds['playerAttack'] = this.createSwordSlashSound();
+        this.sounds['playerAttack_bow'] = this.createBowSound();
+        this.sounds['playerAttack_staff'] = this.createMagicCastSound();
+        this.sounds['monsterHit'] = this.createImpactSound(0.15, 300);
+        this.sounds['playerHit'] = this.createPlayerHurtSound();
+        this.sounds['monsterDefeat'] = this.createDefeatSound();
+        this.sounds['criticalHit'] = this.createCriticalHitSound();
         
-        // Create music tracks
-        this.createMusicTrack('overworld', 120, [
+        // UI / Feedback sounds
+        this.sounds['levelUp'] = this.createLevelUpFanfare();
+        this.sounds['questComplete'] = this.createQuestCompleteSound();
+        this.sounds['itemPickup'] = this.createPickupSound();
+        this.sounds['uiClick'] = this.createUIClickSound();
+        this.sounds['uiOpen'] = this.createUIOpenSound();
+        this.sounds['uiClose'] = this.createUICloseSound();
+        this.sounds['notification'] = this.createNotificationSound();
+        
+        // Movement
+        this.sounds['footstep'] = this.createFootstepSound();
+        
+        // Interaction
+        this.sounds['shrineActivate'] = this.createShrineSound();
+        this.sounds['npcGreet'] = this.createNPCGreetSound();
+        this.sounds['purchase'] = this.createPurchaseSound();
+        
+        // Create biome-specific music tracks
+        this.createMusicTrack('GREEN_HILLS', 120, [
             // Main Theme A (peaceful village)
             { note: 'C4', duration: 0.5 }, { note: 'E4', duration: 0.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 0.5 },
             { note: 'D4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'A4', duration: 0.5 }, { note: 'F4', duration: 0.5 },
@@ -119,7 +166,7 @@ export class AudioManager {
             { note: 'G4', duration: 0.5 }, { note: 'F4', duration: 0.5 }, { note: 'E4', duration: 1.0 }, { note: 'C4', duration: 1.0 },
         ]);
         
-        this.createMusicTrack('adventure', 140, [
+        this.createMusicTrack('DESERT', 140, [
             // Epic Intro
             { note: 'G3', duration: 0.5 }, { note: 'C4', duration: 0.5 }, { note: 'D4', duration: 0.5 }, { note: 'D#4', duration: 0.5 },
             { note: 'F4', duration: 0.25 }, { note: 'G4', duration: 0.25 }, { note: 'A#4', duration: 0.5 }, { note: 'G4', duration: 1.0 },
@@ -145,7 +192,7 @@ export class AudioManager {
             { note: 'C5', duration: 2.0 }, { note: 'G4', duration: 2.0 },
         ]);
         
-        this.createMusicTrack('mystic', 90, [
+        this.createMusicTrack('MAGIC_FOREST', 90, [
             // Ethereal Opening
             { note: 'C3', duration: 1.5 }, { note: 'G3', duration: 0.5 }, { note: 'A#3', duration: 1.5 }, { note: 'F3', duration: 0.5 },
             { note: 'D#3', duration: 1.5 }, { note: 'A#3', duration: 0.5 }, { note: 'D3', duration: 1.5 }, { note: 'G3', duration: 0.5 },
@@ -181,7 +228,439 @@ export class AudioManager {
             { note: 'D#4', duration: 2.0 }, { note: 'C4', duration: 4.0 }, { note: 'C3', duration: 4.0 }
         ]);
         
-        console.log("🎵 Sounds and music preloaded");
+        // Additional biome tracks
+        this.createMusicTrack('VOLCANO', 100, [
+            { note: 'E3', duration: 1.0 }, { note: 'G3', duration: 0.5 }, { note: 'A3', duration: 0.5 },
+            { note: 'B3', duration: 1.0 }, { note: 'E3', duration: 0.5 }, { note: 'G3', duration: 0.5 },
+            { note: 'A3', duration: 0.5 }, { note: 'G3', duration: 0.5 }, { note: 'E3', duration: 1.0 },
+            { note: 'D3', duration: 1.0 }, { note: 'E3', duration: 0.5 }, { note: 'G3', duration: 0.5 },
+            { note: 'B3', duration: 1.0 }, { note: 'A3', duration: 0.5 }, { note: 'G3', duration: 0.5 },
+            { note: 'E3', duration: 2.0 },
+        ]);
+        
+        this.createMusicTrack('MOUNTAINS', 80, [
+            { note: 'D4', duration: 1.0 }, { note: 'A3', duration: 0.5 }, { note: 'F3', duration: 1.0 },
+            { note: 'G3', duration: 0.5 }, { note: 'A3', duration: 1.0 }, { note: 'D4', duration: 0.5 },
+            { note: 'C4', duration: 1.0 }, { note: 'A3', duration: 0.5 }, { note: 'G3', duration: 1.0 },
+            { note: 'F3', duration: 1.0 }, { note: 'G3', duration: 0.5 }, { note: 'A3', duration: 1.5 },
+            { note: 'D4', duration: 2.0 },
+        ]);
+        
+        this.createMusicTrack('LAKE', 70, [
+            { note: 'C4', duration: 1.5 }, { note: 'E4', duration: 1.0 }, { note: 'G4', duration: 0.5 },
+            { note: 'A4', duration: 1.5 }, { note: 'G4', duration: 0.5 }, { note: 'E4', duration: 1.0 },
+            { note: 'D4', duration: 1.5 }, { note: 'C4', duration: 1.0 }, { note: 'E4', duration: 0.5 },
+            { note: 'G4', duration: 2.0 }, { note: 'E4', duration: 1.0 }, { note: 'C4', duration: 2.0 },
+        ]);
+        
+        this.createMusicTrack('BARREN_LAND', 60, [
+            { note: 'A3', duration: 2.0 }, { note: 'C4', duration: 1.0 }, { note: 'D4', duration: 0.5 },
+            { note: 'E4', duration: 1.5 }, { note: 'D4', duration: 0.5 }, { note: 'C4', duration: 1.0 },
+            { note: 'A3', duration: 2.0 }, { note: 'G3', duration: 1.0 }, { note: 'A3', duration: 3.0 },
+        ]);
+        
+        console.log("🎵 Enhanced sounds and biome-specific music preloaded");
+    }
+
+    // === Enhanced Sound Creation Methods ===
+    
+    createSwordSlashSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            // Noise burst filtered to high frequencies
+            const bufferSize = this.audioContext.sampleRate * 0.08;
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 3);
+            }
+            const source = this.audioContext.createBufferSource();
+            source.buffer = buffer;
+            const filter = this.audioContext.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 2000;
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            source.start(now);
+            source.stop(now + 0.08);
+        };
+    }
+    
+    createBowSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        };
+    }
+    
+    createMagicCastSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            // Magical shimmer - two detuned oscillators
+            for (let i = 0; i < 2; i++) {
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600 + i * 15, now);
+                osc.frequency.exponentialRampToValueAtTime(1200 + i * 30, now + 0.2);
+                const gain = this.audioContext.createGain();
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.connect(gain);
+                gain.connect(this.sfxGain || this.audioContext.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        };
+    }
+    
+    createImpactSound(duration, freq) {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const bufferSize = this.audioContext.sampleRate * duration;
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+            }
+            const source = this.audioContext.createBufferSource();
+            source.buffer = buffer;
+            const filter = this.audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = freq;
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            source.start(now);
+            source.stop(now + duration);
+        };
+    }
+    
+    createPlayerHurtSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.25);
+        };
+    }
+    
+    createDefeatSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        };
+    }
+    
+    createCriticalHitSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            // Bright rising tone + impact
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(500, now);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        };
+    }
+    
+    createLevelUpFanfare() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6
+            notes.forEach((freq, i) => {
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                const gain = this.audioContext.createGain();
+                const start = now + i * 0.12;
+                gain.gain.setValueAtTime(0, start);
+                gain.gain.linearRampToValueAtTime(0.3, start + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
+                osc.connect(gain);
+                gain.connect(this.sfxGain || this.audioContext.destination);
+                osc.start(start);
+                osc.stop(start + 0.5);
+            });
+        };
+    }
+    
+    createQuestCompleteSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const notes = [392, 493.88, 587.33, 783.99]; // G4 B4 D5 G5
+            notes.forEach((freq, i) => {
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const gain = this.audioContext.createGain();
+                const start = now + i * 0.15;
+                gain.gain.setValueAtTime(0, start);
+                gain.gain.linearRampToValueAtTime(0.25, start + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.6);
+                osc.connect(gain);
+                gain.connect(this.sfxGain || this.audioContext.destination);
+                osc.start(start);
+                osc.stop(start + 0.6);
+            });
+        };
+    }
+    
+    createPickupSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.08);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        };
+    }
+    
+    createUIClickSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = 800;
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.04);
+        };
+    }
+    
+    createUIOpenSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        };
+    }
+    
+    createUICloseSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+        };
+    }
+    
+    createNotificationSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            [660, 880].forEach((freq, i) => {
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const gain = this.audioContext.createGain();
+                const start = now + i * 0.1;
+                gain.gain.setValueAtTime(0.15, start);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
+                osc.connect(gain);
+                gain.connect(this.sfxGain || this.audioContext.destination);
+                osc.start(start);
+                osc.stop(start + 0.15);
+            });
+        };
+    }
+    
+    createFootstepSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const bufferSize = this.audioContext.sampleRate * 0.05;
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 5);
+            }
+            const source = this.audioContext.createBufferSource();
+            source.buffer = buffer;
+            const filter = this.audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 400 + Math.random() * 200;
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            source.start(now);
+            source.stop(now + 0.05);
+        };
+    }
+    
+    createShrineSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            // Ethereal shimmer chord
+            [440, 554.37, 659.25, 880].forEach((freq, i) => {
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const gain = this.audioContext.createGain();
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.15, now + 0.3);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+                osc.connect(gain);
+                gain.connect(this.sfxGain || this.audioContext.destination);
+                osc.start(now + i * 0.05);
+                osc.stop(now + 1.5);
+            });
+        };
+    }
+    
+    createNPCGreetSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(350, now);
+            osc.frequency.linearRampToValueAtTime(500, now + 0.15);
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc.connect(gain);
+            gain.connect(this.sfxGain || this.audioContext.destination);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        };
+    }
+    
+    createPurchaseSound() {
+        return () => {
+            if (!this.audioContext || this.audioContext.state !== 'running') return;
+            const now = this.audioContext.currentTime;
+            // Coin jingle
+            [1200, 1400, 1600].forEach((freq, i) => {
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const gain = this.audioContext.createGain();
+                const start = now + i * 0.06;
+                gain.gain.setValueAtTime(0.12, start);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.1);
+                osc.connect(gain);
+                gain.connect(this.sfxGain || this.audioContext.destination);
+                osc.start(start);
+                osc.stop(start + 0.1);
+            });
+        };
+    }
+    
+    // Volume control methods
+    setMasterVolume(value) {
+        this.masterVolume = Math.max(0, Math.min(1, value));
+        if (this.masterGain) {
+            this.masterGain.gain.setTargetAtTime(this.masterVolume, this.audioContext.currentTime, 0.1);
+        }
+    }
+    
+    setMusicVolume(value) {
+        this.musicVolume = Math.max(0, Math.min(1, value));
+        if (this.musicGain) {
+            this.musicGain.gain.setTargetAtTime(this.musicVolume, this.audioContext.currentTime, 0.1);
+        }
+    }
+    
+    setSFXVolume(value) {
+        this.sfxVolume = Math.max(0, Math.min(1, value));
+        if (this.sfxGain) {
+            this.sfxGain.gain.setTargetAtTime(this.sfxVolume, this.audioContext.currentTime, 0.1);
+        }
+    }
+    
+    // Biome-aware music selection
+    setBiome(biomeName) {
+        this.currentBiome = biomeName;
+        if (this.musicEnabled && this.isInitialized) {
+            // Transition to biome-appropriate music
+            this.playMusicNow();
+        }
     }
 
     createSynthSound(frequency, duration, type = 'sine', volume = 0.5) {
@@ -229,16 +708,28 @@ export class AudioManager {
     }
     // Note to frequency map (simplified)
     getNoteFrequency(note) {
-        const notes = { 'C': 261.63, 'D': 293.66, 'E': 329.63, 'F': 349.23, 'G': 392.00, 'A': 440.00, 'B': 493.88 };
-        const octave = parseInt(note.replace('#', '').slice(-1), 10);
-        const key = note.replace('#', '').slice(0, -1);
-        const baseFreq = notes[key];
+        // Full chromatic note map at octave 4
+        const noteMap = {
+            'C': 261.63, 'C#': 277.18, 'Db': 277.18,
+            'D': 293.66, 'D#': 311.13, 'Eb': 311.13,
+            'E': 329.63, 'Fb': 329.63,
+            'F': 349.23, 'F#': 369.99, 'Gb': 369.99,
+            'G': 392.00, 'G#': 415.30, 'Ab': 415.30,
+            'A': 440.00, 'A#': 466.16, 'Bb': 466.16,
+            'B': 493.88, 'Cb': 493.88
+        };
+        
+        // Parse note name and octave (e.g., "A#4" -> noteName="A#", octave=4)
+        const octaveChar = note.slice(-1);
+        const octave = parseInt(octaveChar, 10);
+        const noteName = note.slice(0, -1);
+        
+        if (isNaN(octave)) return null;
+        
+        const baseFreq = noteMap[noteName];
         if (!baseFreq) return null;
-        let freq = baseFreq * Math.pow(2, octave - 4);
-        if (note.includes('#')) {
-            freq *= Math.pow(2, 1/12); // Go up one semitone for a sharp
-        }
-        return freq;
+        
+        return baseFreq * Math.pow(2, octave - 4);
     }
     createMusicTrack(name, tempo, sequence) {
         this.musicTracks[name] = { tempo, sequence };
@@ -275,7 +766,7 @@ export class AudioManager {
     }
     
     playMusicNow() {
-        this.stopMusic(); // Stop any existing music
+        this.stopMusic();
         this.musicEnabled = true;
         
         const trackNames = Object.keys(this.musicTracks);
@@ -292,13 +783,32 @@ export class AudioManager {
                 return;
             }
             
-            const trackName = trackNames[Math.floor(Math.random() * trackNames.length)];
+            // Prefer biome-specific track, fallback to random
+            let trackName = this.currentBiome;
+            if (!this.musicTracks[trackName]) {
+                trackName = trackNames[Math.floor(Math.random() * trackNames.length)];
+            }
+            
             const track = this.musicTracks[trackName];
             const noteDuration = 60 / track.tempo;
             let scheduleTime = this.audioContext.currentTime;
             let totalDuration = 0;
+            this.currentTrackName = trackName;
             
             console.log(`🎵 Playing track: ${trackName}`);
+            
+            // Choose oscillator type based on biome for tonal variety
+            const biomeOscTypes = {
+                'GREEN_HILLS': 'triangle',
+                'DESERT': 'sawtooth',
+                'MAGIC_FOREST': 'sine',
+                'VOLCANO': 'square',
+                'MOUNTAINS': 'triangle',
+                'LAKE': 'sine',
+                'BARREN_LAND': 'sawtooth'
+            };
+            const oscType = biomeOscTypes[trackName] || 'triangle';
+            const destination = this.musicGain || this.audioContext.destination;
             
             for (const note of track.sequence) {
                 const freq = this.getNoteFrequency(note.note);
@@ -306,20 +816,35 @@ export class AudioManager {
                 
                 if (freq && this.audioContext && this.audioContext.state === 'running') {
                     try {
+                        // Main melody voice
                         const oscillator = this.audioContext.createOscillator();
                         const gainNode = this.audioContext.createGain();
                         
-                        oscillator.type = 'triangle';
+                        oscillator.type = oscType;
                         oscillator.frequency.setValueAtTime(freq, scheduleTime);
-                        gainNode.gain.setValueAtTime(0.08, scheduleTime); // Lower volume
+                        gainNode.gain.setValueAtTime(0.1, scheduleTime);
                         gainNode.gain.exponentialRampToValueAtTime(0.001, scheduleTime + duration * 0.9);
                         
                         oscillator.connect(gainNode);
-                        gainNode.connect(this.audioContext.destination);
+                        gainNode.connect(destination);
                         oscillator.start(scheduleTime);
                         oscillator.stop(scheduleTime + duration);
+                        
+                        // Add a subtle harmonic an octave below for depth (pad layer)
+                        if (duration >= 0.5) {
+                            const pad = this.audioContext.createOscillator();
+                            const padGain = this.audioContext.createGain();
+                            pad.type = 'sine';
+                            pad.frequency.setValueAtTime(freq / 2, scheduleTime);
+                            padGain.gain.setValueAtTime(0.03, scheduleTime);
+                            padGain.gain.exponentialRampToValueAtTime(0.001, scheduleTime + duration * 0.85);
+                            pad.connect(padGain);
+                            padGain.connect(destination);
+                            pad.start(scheduleTime);
+                            pad.stop(scheduleTime + duration);
+                        }
                     } catch (error) {
-                        console.error("🎵 Error creating audio note:", error);
+                        // Silently continue on audio errors
                     }
                 }
                 
@@ -328,7 +853,7 @@ export class AudioManager {
             }
             
             // Schedule next track with a pause
-            const pauseDuration = 3000 + Math.random() * 5000; // 3-8 second pause
+            const pauseDuration = 2000 + Math.random() * 4000;
             this.musicTimeoutId = setTimeout(playTrack, (totalDuration * 1000) + pauseDuration);
         };
         

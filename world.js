@@ -98,8 +98,10 @@ export class World {
     createGround() {
         const groundGeometry = new THREE.PlaneGeometry(this.worldSize, this.worldSize);
         
-        // Use enhanced ground texture for better visuals
-        const groundTexture = this.createGroundTexture(256);
+        // Use adaptive resolution ground texture (lower on weak devices)
+        const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const textureRes = isMobile ? 128 : 256;
+        const groundTexture = this.createGroundTexture(textureRes);
         const groundMaterial = new THREE.MeshLambertMaterial({
             map: groundTexture,
             side: THREE.DoubleSide
@@ -131,7 +133,7 @@ export class World {
                 let total = 0;
                 let amplitude = this.biome.terrainNoiseStrength || 1;
                 let frequency = this.biome.terrainNoiseScale || 0.08;
-                const octaves = 6; // More octaves for detail
+                const octaves = resolution >= 256 ? 5 : 3; // Fewer octaves for lower resolutions
                 
                 for (let i = 0; i < octaves; i++) {
                     total += this.terrainNoise.noise2D(worldX * frequency, worldZ * frequency) * amplitude;

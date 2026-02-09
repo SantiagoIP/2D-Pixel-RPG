@@ -794,6 +794,28 @@ export class UIManager {
             .notification.error {
                 background: #f44336;
             }
+            
+            @keyframes notifSlideIn {
+                0% { transform: translateX(120%); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes notifSlideOut {
+                0% { transform: translateX(0); opacity: 1; }
+                100% { transform: translateX(120%); opacity: 0; }
+            }
+            
+            @keyframes damageFloat {
+                0% { opacity: 1; transform: translateY(0) scale(1); }
+                20% { opacity: 1; transform: translateY(-15px) scale(1.2); }
+                100% { opacity: 0; transform: translateY(-60px) scale(0.7); }
+            }
+            
+            @keyframes combatLogFade {
+                0% { opacity: 1; }
+                70% { opacity: 0.7; }
+                100% { opacity: 0; }
+            }
         `;
         document.head.appendChild(style);
         const uiOverlay = document.createElement('div');
@@ -825,6 +847,21 @@ export class UIManager {
         this.manaBarFill.className = 'mana-bar-fill';
         manaBarBackground.appendChild(this.manaBarFill);
         
+        // Stamina bar
+        this.staminaText = document.createElement('div');
+        this.staminaText.className = 'health-text';
+        this.staminaText.style.color = '#28a745';
+        this.staminaText.textContent = 'SP: ???/???';
+        const staminaBarBackground = document.createElement('div');
+        staminaBarBackground.className = 'bar-background';
+        staminaBarBackground.style.width = '180px';
+        this.staminaBarFill = document.createElement('div');
+        this.staminaBarFill.className = 'health-bar-fill';
+        this.staminaBarFill.style.background = 'linear-gradient(90deg, #28a745, #4caf50, #81c784)';
+        this.staminaBarFill.style.boxShadow = '0 0 12px rgba(40, 167, 69, 0.7)';
+        this.staminaBarFill.style.animation = 'none';
+        staminaBarBackground.appendChild(this.staminaBarFill);
+        
         this.levelDisplay = document.createElement('div');
         this.levelDisplay.className = 'level-text';
         this.levelDisplay.textContent = 'Level: 1';
@@ -833,7 +870,7 @@ export class UIManager {
         this.xpBarFill = document.createElement('div');
         this.xpBarFill.className = 'xp-bar-fill';
         xpBarBackground.appendChild(this.xpBarFill);
-        this.healthDisplayContainer.append(this.healthText, healthBarBackground, this.manaText, manaBarBackground, this.levelDisplay, xpBarBackground);
+        this.healthDisplayContainer.append(this.healthText, healthBarBackground, this.manaText, manaBarBackground, this.staminaText, staminaBarBackground, this.levelDisplay, xpBarBackground);
         // --- Stats Display (below health) ---
         this.statsDisplay = document.createElement('div');
         this.statsDisplay.className = 'stats-display hud-container';
@@ -985,21 +1022,46 @@ export class UIManager {
     }
     updatePlayerHealth(currentHealth, maxHealth) {
         if (this.healthBarFill && this.healthText) {
+            const roundedHealth = Math.max(0, Math.round(currentHealth * 10) / 10);
+            // Only update DOM when value actually changes (avoid costly reflows)
+            if (this._lastHealthDisplay === roundedHealth && this._lastMaxHealth === maxHealth) return;
+            this._lastHealthDisplay = roundedHealth;
+            this._lastMaxHealth = maxHealth;
+            
             const healthPercentage = (currentHealth / maxHealth) * 100;
-            // Flash effect when health changes
-            this.healthBarFill.classList.remove('hp-flash');
-            void this.healthBarFill.offsetWidth; // Force reflow
-            this.healthBarFill.classList.add('hp-flash');
+            
+            // Flash effect only when health decreases significantly
+            if (this.lastHealth !== undefined && roundedHealth < this.lastHealth - 0.5) {
+                this.healthBarFill.classList.remove('hp-flash');
+                void this.healthBarFill.offsetWidth;
+                this.healthBarFill.classList.add('hp-flash');
+            }
+            this.lastHealth = roundedHealth;
             
             this.healthBarFill.style.width = `${healthPercentage}%`;
-            this.healthText.innerHTML = `<span class='pixel-heart'></span> ${Math.max(0, currentHealth)} / ${maxHealth}`;
+            this.healthText.innerHTML = `<span class='pixel-heart'></span> ${Math.floor(roundedHealth)} / ${maxHealth}`;
         }
     }
     updateMana(currentMana, maxMana) {
         if (this.manaBarFill && this.manaText) {
+            const roundedMana = Math.floor(currentMana);
+            if (this._lastManaDisplay === roundedMana) return;
+            this._lastManaDisplay = roundedMana;
+            
             const manaPercentage = (currentMana / maxMana) * 100;
             this.manaBarFill.style.width = `${manaPercentage}%`;
-            this.manaText.innerHTML = `<span class='pixel-star'>✦</span> ${Math.floor(currentMana)} / ${maxMana}`;
+            this.manaText.innerHTML = `<span class='pixel-star'>✦</span> ${roundedMana} / ${maxMana}`;
+        }
+    }
+    updateStamina(currentStamina, maxStamina) {
+        if (this.staminaBarFill && this.staminaText) {
+            const rounded = Math.floor(currentStamina);
+            if (this._lastStaminaDisplay === rounded) return;
+            this._lastStaminaDisplay = rounded;
+            
+            const staminaPercentage = (currentStamina / maxStamina) * 100;
+            this.staminaBarFill.style.width = `${staminaPercentage}%`;
+            this.staminaText.innerHTML = `<span style="color:#28a745;">⚡</span> ${rounded} / ${maxStamina}`;
         }
     }
     updateExperience(level, currentXP, xpToNextLevel) {
@@ -1090,6 +1152,12 @@ export class UIManager {
     }
     updateMinimap(playerPosition, worldSize, castlePosition, monsterPositions = [], npcPositions = []) {
         if (!this.minimapContainer) return;
+        
+        // Throttle minimap updates to every 3 frames for performance
+        if (!this._minimapFrame) this._minimapFrame = 0;
+        this._minimapFrame++;
+        if (this._minimapFrame % 3 !== 0) return;
+        
         const mapWidth = this.minimapContainer.clientWidth;
         const mapHeight = this.minimapContainer.clientHeight;
         
@@ -1171,19 +1239,107 @@ export class UIManager {
         }
     }
     showGameOver() {
-        const gameOverMessage = document.createElement('div');
-         gameOverMessage.textContent = 'GAME OVER';
-         gameOverMessage.style.position = 'absolute';
-         gameOverMessage.style.top = '50%';
-         gameOverMessage.style.left = '50%';
-         gameOverMessage.style.transform = 'translate(-50%, -50%)';
-         gameOverMessage.style.color = 'red';
-         gameOverMessage.style.fontSize = '48px';
-         gameOverMessage.style.fontWeight = 'bold';
-         gameOverMessage.style.textShadow = '2px 2px 4px black';
-         gameOverMessage.style.pointerEvents = 'none';
-         this.container.appendChild(gameOverMessage);
-     }
+        const overlay = document.createElement('div');
+        overlay.id = 'game-over-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(10, 0, 0, 0.92);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 2000;
+            animation: gameOverFadeIn 1.5s ease-out;
+            pointer-events: auto;
+            font-family: 'Cinzel', serif;
+        `;
+        
+        overlay.innerHTML = `
+            <style>
+                @keyframes gameOverFadeIn {
+                    0% { opacity: 0; }
+                    100% { opacity: 1; }
+                }
+                @keyframes gameOverTextGlow {
+                    0%, 100% { text-shadow: 0 0 20px #ff0000, 0 0 40px #880000, 3px 3px 6px #000; }
+                    50% { text-shadow: 0 0 40px #ff3333, 0 0 80px #cc0000, 3px 3px 8px #000; }
+                }
+                @keyframes skullBob {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-8px); }
+                }
+            </style>
+            <div style="font-size: 5rem; margin-bottom: 20px; animation: skullBob 2s ease-in-out infinite;">💀</div>
+            <h1 style="
+                font-size: 3.5rem; color: #dc3545; margin: 0 0 15px 0;
+                font-family: 'Uncial Antiqua', cursive;
+                animation: gameOverTextGlow 3s ease-in-out infinite;
+            ">YOU HAVE FALLEN</h1>
+            <p style="color: #e6d5a8; font-size: 1.1rem; margin: 0 0 10px 0; opacity: 0.8;">
+                The realm mourns another hero lost to the darkness...
+            </p>
+            <p id="death-stats" style="color: #aaa; font-size: 0.85rem; margin: 0 0 40px 0; opacity: 0.6;"></p>
+            <div style="display: flex; gap: 20px;">
+                <button id="respawn-btn" style="
+                    background: linear-gradient(135deg, #dc3545, #a71d2a);
+                    border: 3px solid #ffd700; color: white;
+                    padding: 18px 40px; border-radius: 12px;
+                    font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.2rem;
+                    cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+                ">Rise Again</button>
+                <button id="quit-btn" style="
+                    background: linear-gradient(135deg, #555, #333);
+                    border: 3px solid #888; color: #ccc;
+                    padding: 18px 40px; border-radius: 12px;
+                    font-family: 'Cinzel', serif; font-weight: 600; font-size: 1rem;
+                    cursor: pointer; transition: all 0.3s ease;
+                ">Return to Menu</button>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Populate death stats
+        if (window.game) {
+            const stats = document.getElementById('death-stats');
+            const playTime = Math.floor((Date.now() - (window.game.gameStartTime || Date.now())) / 1000);
+            const minutes = Math.floor(playTime / 60);
+            const seconds = playTime % 60;
+            stats.textContent = `Level ${window.game.player?.level || 1} | Gold: ${window.game.score || 0} | Time: ${minutes}m ${seconds}s`;
+        }
+        
+        // Button handlers
+        document.getElementById('respawn-btn').addEventListener('click', () => {
+            overlay.remove();
+            if (window.game) {
+                window.game.isGameOver = false;
+                window.game.player.currentHealth = window.game.player.maxHealth;
+                window.game.player.mana = window.game.player.maxMana;
+                window.game.player.mesh.position.set(0, window.game.player.size / 2, -25);
+                window.game.player.isInvulnerable = true;
+                window.game.player.invulnerabilityTimer = 3.0;
+                // Clear monsters near spawn
+                window.game.monsters.forEach(m => { window.game.scene.remove(m.mesh); m.dispose(); });
+                window.game.monsters = [];
+            }
+        });
+        
+        document.getElementById('quit-btn').addEventListener('click', () => {
+            window.location.reload();
+        });
+        
+        // Hover effects
+        const respawnBtn = document.getElementById('respawn-btn');
+        respawnBtn.addEventListener('mouseenter', () => {
+            respawnBtn.style.transform = 'scale(1.05)';
+            respawnBtn.style.boxShadow = '0 6px 25px rgba(220, 53, 69, 0.6)';
+        });
+        respawnBtn.addEventListener('mouseleave', () => {
+            respawnBtn.style.transform = 'scale(1)';
+            respawnBtn.style.boxShadow = '0 4px 15px rgba(220, 53, 69, 0.4)';
+        });
+    }
     showLevelUpUI(upgradeOptions, onSelectCallback) {
         this.hideLevelUpUI(); // Ensure no duplicates
         this.levelUpContainer = document.createElement('div');
@@ -1856,34 +2012,137 @@ export class UIManager {
     }
 
     showNotification(message, type = 'info') {
+        const colors = {
+            'error': 'linear-gradient(135deg, #f44336, #d32f2f)',
+            'success': 'linear-gradient(135deg, #4caf50, #388e3c)',
+            'info': 'linear-gradient(135deg, #2196f3, #1976d2)',
+            'warning': 'linear-gradient(135deg, #ff9800, #f57c00)',
+            'resource': 'linear-gradient(135deg, #9c27b0, #7b1fa2)',
+            'quest': 'linear-gradient(135deg, #ff5722, #e64a19)'
+        };
+        
+        const icons = {
+            'error': '❌',
+            'success': '✅',
+            'info': 'ℹ️',
+            'warning': '⚠️',
+            'resource': '🌿',
+            'quest': '📜'
+        };
+        
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : '#2196f3'};
+            top: ${20 + (this._notifStack || 0) * 55}px;
+            right: 20px;
+            background: ${colors[type] || colors.info};
             color: white;
-            padding: 15px 25px;
-            border-radius: 4px;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 10px;
+            padding: 14px 22px;
+            border-radius: 10px;
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+            font-size: 0.9rem;
             z-index: 2000;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255,255,255,0.1) inset;
+            border: 2px solid rgba(255,255,255,0.2);
+            animation: notifSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 350px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         `;
-        notification.textContent = message;
+        notification.innerHTML = `<span style="font-size:1.2em;">${icons[type] || icons.info}</span><span>${message}</span>`;
         
         document.body.appendChild(notification);
+        this._notifStack = (this._notifStack || 0) + 1;
         
         setTimeout(() => {
-            if (notification.parentNode) {
-                document.body.removeChild(notification);
-            }
-        }, 2000);
+            notification.style.animation = 'notifSlideOut 0.3s ease-in forwards';
+            setTimeout(() => {
+                if (notification.parentNode) notification.remove();
+                this._notifStack = Math.max(0, (this._notifStack || 1) - 1);
+            }, 300);
+        }, 2500);
+    }
+
+    // Floating damage numbers - shown over the game canvas
+    showDamageNumber(amount, position, type = 'damage') {
+        const floater = document.createElement('div');
+        const colors = {
+            'damage': '#ff4444',
+            'heal': '#44ff44',
+            'critical': '#ffd700',
+            'xp': '#87ceeb',
+            'gold': '#ffeb3b',
+            'miss': '#aaaaaa',
+            'mana': '#4488ff'
+        };
+        
+        const color = colors[type] || colors.damage;
+        const isCrit = type === 'critical';
+        const text = type === 'miss' ? 'MISS' : 
+                     type === 'xp' ? `+${amount} XP` : 
+                     type === 'gold' ? `+${amount} G` :
+                     type === 'heal' ? `+${amount}` :
+                     type === 'mana' ? `+${amount} MP` :
+                     `${amount}`;
+        
+        floater.textContent = text;
+        floater.style.cssText = `
+            position: fixed;
+            left: ${50 + (Math.random() - 0.5) * 10}%;
+            top: ${40 + (Math.random() - 0.5) * 10}%;
+            color: ${color};
+            font-family: 'Press Start 2P', monospace;
+            font-size: ${isCrit ? '1.8em' : '1.2em'};
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 1800;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 10px ${color}40;
+            animation: damageFloat 1.2s ease-out forwards;
+        `;
+        
+        document.body.appendChild(floater);
+        setTimeout(() => { if (floater.parentNode) floater.remove(); }, 1200);
+    }
+    
+    // Show a combat log message (bottom-left area)
+    showCombatMessage(message, color = '#fff') {
+        if (!this.combatLog) {
+            this.combatLog = document.createElement('div');
+            this.combatLog.style.cssText = `
+                position: fixed; bottom: 100px; left: 20px;
+                max-width: 300px; max-height: 150px;
+                overflow-y: hidden; pointer-events: none;
+                z-index: 15; font-family: 'Press Start 2P', monospace;
+                font-size: 0.55em; display: flex; flex-direction: column-reverse;
+            `;
+            document.body.appendChild(this.combatLog);
+        }
+        
+        const entry = document.createElement('div');
+        entry.textContent = message;
+        entry.style.cssText = `
+            color: ${color}; margin-bottom: 3px; opacity: 1;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+            animation: combatLogFade 4s ease-out forwards;
+        `;
+        
+        this.combatLog.prepend(entry);
+        
+        // Keep only last 5 messages
+        while (this.combatLog.children.length > 5) {
+            this.combatLog.removeChild(this.combatLog.lastChild);
+        }
+        
+        setTimeout(() => { if (entry.parentNode) entry.remove(); }, 4000);
     }
 
     // Call this when destroying the UIManager instance
     destroy() {
         this.clearAllTimers();
+        if (this.combatLog && this.combatLog.parentNode) {
+            this.combatLog.remove();
+        }
     }
 }

@@ -12,7 +12,8 @@ export const BUFFS = {
         icon: '👟',
         description: 'Movement speed greatly increased for 15 seconds.',
         duration: 15,
-        potency: 1.8, // speed multiplier
+        potency: 1.8,
+        effects: { speed: 1.8 }
     },
     [BUFF_TYPES.ATTACK_SPEED]: {
         id: BUFF_TYPES.ATTACK_SPEED,
@@ -20,14 +21,16 @@ export const BUFFS = {
         icon: '⚔️',
         description: 'Attack speed greatly increased for 15 seconds.',
         duration: 15,
-        potency: 0.5, // attack cooldown multiplier
+        potency: 0.5,
+        effects: { attackSpeed: 2.0 }
     },
     [BUFF_TYPES.DAMAGE_SHIELD]: {
         id: BUFF_TYPES.DAMAGE_SHIELD,
         name: 'Aegis',
         icon: '🛡️',
         description: 'Absorb the next source of damage.',
-        duration: Infinity, // Lasts until used
-        potency: 1, // one-time shield
+        duration: Infinity,
+        potency: 1,
+        effects: {}
     }
 };

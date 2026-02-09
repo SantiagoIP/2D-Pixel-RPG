@@ -620,218 +620,27 @@ export class InventorySystem {
         }
     }
     
-    // Enhanced add item with equipment support
-    addItem(itemId, quantity = 1, itemData = null) {
-        if (this.items.has(itemId)) {
-            const existingItem = this.items.get(itemId);
-            existingItem.quantity += quantity;
-        } else {
-            this.items.set(itemId, { 
-                quantity, 
-                type: itemData?.type || 'consumable',
-                stats: itemData?.stats || {},
-                description: itemData?.description || '',
-                rarity: itemData?.rarity || 'common'
-            });
-        }
-        console.log(`Added ${quantity} ${itemId}(s) to inventory`);
-        this.refreshInventoryDisplay();
-    }
-    
-    // New equipment methods
-    equipItem(itemId) {
-        const item = this.items.get(itemId);
-        if (!item) return false;
-        
-        const equipSlot = this.getEquipmentSlot(item.type);
-        if (!equipSlot) return false;
-        
-        // Unequip current item in slot if any
-        if (this.equipment[equipSlot]) {
-            this.unequipItem(equipSlot);
-        }
-        
-        // Equip new item
-        this.equipment[equipSlot] = {
-            id: itemId,
-            ...item
-        };
-        
-        // Remove from inventory
-        this.removeItem(itemId, 1);
-        
-        // Apply stat bonuses
-        this.applyEquipmentBonuses();
-        
-        console.log(`Equipped ${itemId} in ${equipSlot} slot`);
-        this.refreshInventoryDisplay();
-        return true;
-    }
-    
-    unequipItem(slot) {
-        const equipped = this.equipment[slot];
-        if (!equipped) return false;
-        
-        // Add back to inventory
-        this.addItem(equipped.id, 1, {
-            type: equipped.type,
-            stats: equipped.stats,
-            description: equipped.description,
-            rarity: equipped.rarity
+    // Save/Load support methods
+    getAllItems() {
+        const items = [];
+        this.items.forEach((item, id) => {
+            items.push({ ...item, id });
         });
-        
-        // Remove from equipment
-        this.equipment[slot] = null;
-        
-        // Recalculate bonuses
-        this.applyEquipmentBonuses();
-        
-        console.log(`Unequipped ${equipped.id} from ${slot} slot`);
-        this.refreshInventoryDisplay();
-        return true;
+        return items;
     }
     
-    getEquipmentSlot(itemType) {
-        const slotMap = {
-            'weapon': 'weapon',
-            'sword': 'weapon',
-            'bow': 'weapon', 
-            'staff': 'weapon',
-            'armor': 'armor',
-            'helmet': 'armor',
-            'chestplate': 'armor',
-            'ring': 'accessory',
-            'amulet': 'accessory'
-        };
-        return slotMap[itemType] || null;
-    }
-    
-    applyEquipmentBonuses() {
-        // Reset bonuses
-        this.equipmentBonuses = {
-            attack: 0,
-            defense: 0,
-            speed: 0,
-            health: 0
-        };
-        
-        // Calculate total bonuses from all equipped items
-        Object.values(this.equipment).forEach(item => {
-            if (item && item.stats) {
-                Object.keys(this.equipmentBonuses).forEach(stat => {
-                    if (item.stats[stat]) {
-                        this.equipmentBonuses[stat] += item.stats[stat];
-                    }
-                });
-            }
+    loadItems(itemsData) {
+        if (!Array.isArray(itemsData)) return;
+        this.items.clear();
+        itemsData.forEach(item => {
+            const id = item.id || this.generateItemId();
+            this.items.set(id, { ...item });
         });
-        
-        console.log('Equipment bonuses updated:', this.equipmentBonuses);
+        this.updateInventoryDisplay();
     }
     
-    getTotalStats() {
-        return {
-            attack: this.playerStats.attack + this.equipmentBonuses.attack,
-            defense: this.playerStats.defense + this.equipmentBonuses.defense,
-            speed: this.playerStats.speed + this.equipmentBonuses.speed,
-            maxHealth: this.playerStats.maxHealth + this.equipmentBonuses.health
-        };
+    formatItemName(itemId) {
+        return String(itemId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
     
-    setupEquipmentUI() {
-        // Equipment panel will be added to existing inventory UI
-        // This will be integrated with the main inventory display
-    }
-    
-    // Enhanced inventory display with equipment
-    refreshInventoryDisplay() {
-        if (!this.isVisible || !this.overlay) return;
-        
-        const inventoryGrid = this.overlay.querySelector('.inventory-grid');
-        const equipmentPanel = this.overlay.querySelector('.equipment-panel');
-        
-        if (inventoryGrid) {
-            inventoryGrid.innerHTML = '';
-            
-            // Display regular inventory items
-            this.items.forEach((item, itemId) => {
-                const itemElement = this.createItemElement(itemId, item);
-                inventoryGrid.appendChild(itemElement);
-            });
-        }
-        
-        // Update equipment panel
-        if (equipmentPanel) {
-            this.updateEquipmentPanel(equipmentPanel);
-        }
-        
-        // Update stats display
-        this.updateStatsDisplay();
-    }
-    
-    updateEquipmentPanel(panel) {
-        panel.innerHTML = `
-            <h3>Equipment</h3>
-            <div class="equipment-slots">
-                <div class="equipment-slot weapon-slot">
-                    <div class="slot-label">Weapon</div>
-                    <div class="slot-content">
-                        ${this.equipment.weapon ? this.createEquippedItemDisplay(this.equipment.weapon) : '<div class="empty-slot">Empty</div>'}
-                    </div>
-                </div>
-                <div class="equipment-slot armor-slot">
-                    <div class="slot-label">Armor</div>
-                    <div class="slot-content">
-                        ${this.equipment.armor ? this.createEquippedItemDisplay(this.equipment.armor) : '<div class="empty-slot">Empty</div>'}
-                    </div>
-                </div>
-                <div class="equipment-slot accessory-slot">
-                    <div class="slot-label">Accessory</div>
-                    <div class="slot-content">
-                        ${this.equipment.accessory ? this.createEquippedItemDisplay(this.equipment.accessory) : '<div class="empty-slot">Empty</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    createEquippedItemDisplay(item) {
-        const rarityClass = item.rarity || 'common';
-        const statsText = Object.entries(item.stats || {})
-            .map(([stat, value]) => `${stat}: +${value}`)
-            .join(', ');
-        
-        return `
-            <div class="equipped-item ${rarityClass}" data-item="${item.id}">
-                <div class="item-name">${this.formatItemName(item.id)}</div>
-                ${statsText ? `<div class="item-stats">${statsText}</div>` : ''}
-                <button class="unequip-btn" onclick="window.game.inventorySystem.unequipItem('${this.getEquipmentSlot(item.type)}')">Unequip</button>
-            </div>
-        `;
-    }
-    
-    // Enhanced item element creation with equip functionality
-    createItemElement(itemId, item) {
-        const element = document.createElement('div');
-        element.className = `inventory-item ${item.rarity || 'common'}`;
-        element.dataset.itemId = itemId;
-        
-        const isEquippable = this.getEquipmentSlot(item.type) !== null;
-        const statsText = Object.entries(item.stats || {})
-            .map(([stat, value]) => `${stat}: +${value}`)
-            .join(', ');
-        
-        element.innerHTML = `
-            <div class="item-name">${this.formatItemName(itemId)}</div>
-            <div class="item-quantity">x${item.quantity}</div>
-            ${item.description ? `<div class="item-description">${item.description}</div>` : ''}
-            ${statsText ? `<div class="item-stats">${statsText}</div>` : ''}
-            <div class="item-actions">
-                ${isEquippable ? `<button onclick="window.game.inventorySystem.equipItem('${itemId}')">Equip</button>` : ''}
-                ${item.type === 'consumable' ? `<button onclick="window.game.inventorySystem.useItem('${itemId}')">Use</button>` : ''}
-            </div>
-        `;
-        
-        return element;
-    }
 } 

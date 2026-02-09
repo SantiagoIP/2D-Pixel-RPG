@@ -92,7 +92,7 @@ export class Game {
         
         // Initialize RPG systems
         this.npcManager = new NPCManager(this.scene, this.particleSystem);
-        this.dialogueSystem = new DialogueSystem();
+        this.dialogueSystem = new DialogueSystem(this.uiManager);
         this.inventorySystem = new InventorySystem();
         this.questManager = new QuestManager();
         this.craftingSystem = new CraftingSystem();
@@ -380,13 +380,22 @@ export class Game {
         }
     }
     spawnRandomEncounter() {
-        // Only spawn encounters occasionally during exploration
-        if (Math.random() < 0.08) { // 8% chance per frame for more encounters
+        // Throttle: only check once per ~2 seconds (not every frame)
+        if (!this._encounterTimer) this._encounterTimer = 0;
+        this._encounterTimer += 1;
+        if (this._encounterTimer < 120) return; // Skip ~2 seconds worth of frames at 60fps
+        this._encounterTimer = 0;
+        
+        // Cap active monsters to prevent overwhelming the player
+        const maxMonsters = 6 + this.getBiomeDifficulty(this.currentBiomeName);
+        if (this.monsters.length >= maxMonsters) return;
+        
+        // Spawn chance based on biome difficulty and player level
+        const spawnChance = 0.3 + this.getBiomeDifficulty(this.currentBiomeName) * 0.1;
+        if (Math.random() < spawnChance) {
             const monsterTypes = this.getBiomeMonsters(this.currentBiomeName);
-            // Difficulty-based monster count: harder biomes get more monsters
             const biomeBase = this.getBiomeDifficulty(this.currentBiomeName);
-            const monsterCount = Math.max(1, biomeBase + Math.floor(Math.random() * (biomeBase + 1)));
-            console.log(`🎯 Random encounter in ${this.currentBiomeName}:`, monsterTypes);
+            const monsterCount = Math.max(1, Math.min(biomeBase, maxMonsters - this.monsters.length));
             this.spawnMonsters(monsterCount, monsterTypes);
         }
     }
@@ -513,6 +522,9 @@ export class Game {
         // Update UI with current biome
         this.uiManager.updateBiome(this.currentBiomeName.replace(/_/g, ' '));
         
+        // Set biome-specific music
+        this.audioManager.setBiome(this.currentBiomeName);
+        
         // Audio will start automatically after user interaction
         console.log("🎵 Game started - audio will begin automatically on user interaction");
         console.log("🎮 Pixel Scrolls ready for exploration - Player health:", this.player.currentHealth, "/", this.player.maxHealth);
@@ -557,7 +569,9 @@ export class Game {
             if (attackHit) {
                 this.projectiles.push(attackHit);
                 this.scene.add(attackHit.mesh);
-                this.audioManager.playSound('playerAttack'); // Play attack sound
+                // Play weapon-specific attack sound
+                const weaponSounds = { 'sword': 'playerAttack', 'bow': 'playerAttack_bow', 'staff': 'playerAttack_staff' };
+                this.audioManager.playSound(weaponSounds[this.player.currentWeapon] || 'playerAttack');
             }
         }
 
@@ -613,26 +627,38 @@ export class Game {
                 const collisionThreshold = Math.pow((monster.size + proj.size) / 2, 2);
                 if (distanceSquared < collisionThreshold) {
                      // Hit detected!
-                    monster.takeDamage(proj.damage); // Use projectile's damage instead of player's base damage
+                    monster.takeDamage(proj.damage);
                     hit = true;
-                    proj.expire(); // Remove projectile after hit
-                    this.audioManager.playSound('monsterHit'); // Play monster hit sound
+                    proj.expire();
+                    this.audioManager.playSound('monsterHit');
                     
-                    // Enhanced hit effects based on attack type
+                    // Show floating damage numbers
                     if (proj.isCritical) {
-                        this.particleSystem.createEffect('monsterDefeat', monster.mesh.position); // Bigger effect for crits
+                        this.particleSystem.createEffect('monsterDefeat', monster.mesh.position);
+                        this.uiManager.showDamageNumber(Math.round(proj.damage), monster.mesh.position, 'critical');
+                        this.audioManager.playSound('criticalHit');
+                        this.uiManager.showCombatMessage(`Critical hit! ${Math.round(proj.damage)} damage!`, '#ffd700');
                     } else {
                         this.particleSystem.createEffect('monsterHit', monster.mesh.position);
+                        this.uiManager.showDamageNumber(Math.round(proj.damage), monster.mesh.position, 'damage');
                     }
                     
                     if (!monster.isAlive()) {
-                        this.score += 10; // Add to score
-                        const leveledUp = this.player.addExperience(10); // Grant XP to player
+                        const goldReward = 10 + Math.floor(Math.random() * 5);
+                        const xpReward = 10 + Math.floor(Math.random() * 5);
+                        this.score += goldReward;
+                        const leveledUp = this.player.addExperience(xpReward);
                         if (leveledUp) {
                             this.handleLevelUp();
                         }
-                        this.uiManager.playerGold = this.score; // Sync playerGold with score
-        this.uiManager.updateScore(this.score); // Update UI
+                        this.uiManager.playerGold = this.score;
+                        this.uiManager.updateScore(this.score);
+                        
+                        // Show rewards
+                        this.uiManager.showDamageNumber(goldReward, monster.mesh.position, 'gold');
+                        setTimeout(() => this.uiManager.showDamageNumber(xpReward, monster.mesh.position, 'xp'), 200);
+                        this.audioManager.playSound('monsterDefeat');
+                        this.uiManager.showCombatMessage(`Defeated ${monster.type}! +${goldReward}g +${xpReward}xp`, '#4caf50');
                         
                         // Handle quest objectives for monster kills
                         this.handleMonsterKillQuests(monster);
@@ -692,6 +718,7 @@ export class Game {
          // Update UI
          this.uiManager.updatePlayerHealth(this.player.currentHealth, this.player.maxHealth);
         this.uiManager.updateMana(this.player.mana, this.player.maxMana);
+        this.uiManager.updateStamina(this.player.stamina, this.player.staminaMax);
         this.uiManager.updateExperience(this.player.level, this.player.experience, this.player.xpToNextLevel);
        this.uiManager.updatePlayerStats({
            maxHealth: this.player.maxHealth,
@@ -706,10 +733,26 @@ export class Game {
         // Get NPC positions for minimap
         const npcPositions = this.npcManager.getActiveNPCs().map(npc => npc.position);
         this.uiManager.updateMinimap(this.player.mesh.position, this.world.worldSize, this.world.castlePosition, monsterPositions, npcPositions);
-       // Make camera follow player smoothly
+       // Make camera follow player smoothly (adaptive lerp speed based on distance)
         const targetPosition = this.player.mesh.position.clone();
-        targetPosition.y = this.camera.position.y; // Maintain camera height
-        this.camera.position.lerp(targetPosition, 0.05); // Smooth interpolation
+        targetPosition.y = this.camera.position.y;
+        const camDist = this.camera.position.distanceToSquared(targetPosition);
+        if (camDist > 0.001) { // Only update if camera needs to move
+            const lerpFactor = Math.min(0.1, 0.05 + camDist * 0.001); // Faster catch-up when far
+            this.camera.position.lerp(targetPosition, lerpFactor);
+        }
+        // Low-health warning effect
+        if (this.player.currentHealth <= this.player.maxHealth * 0.3 && this.player.currentHealth > 0) {
+            const pulse = (Math.sin(performance.now() / 300) + 1) / 2;
+            if (this.uiManager.vignetteOverlay) {
+                this.uiManager.vignetteOverlay.style.background = `radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(180,0,0,${0.15 + pulse * 0.2}) 100%)`;
+            }
+        } else {
+            if (this.uiManager.vignetteOverlay) {
+                this.uiManager.vignetteOverlay.style.background = 'radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%)';
+            }
+        }
+        
         // Day/night cycle overlay
         const dayTime = (performance.now() / 1000) % 20;
         // 0-10 = day, 10-20 = night
@@ -769,9 +812,10 @@ export class Game {
             const collisionThreshold = Math.pow((this.player.size + monster.size) / 2, 2);
             if (distanceSquared < collisionThreshold) {
                 if (!this.player.isInvulnerable) {
-                    this.player.takeDamage(1); // Player takes 1 damage from collision
-                    this.audioManager.playSound('playerHit'); // Play player hit sound
-                    // Optional: Player knockback
+                    this.player.takeDamage(1);
+                    this.audioManager.playSound('playerHit');
+                    this.uiManager.showDamageNumber(1, this.player.mesh.position, 'damage');
+                    this.uiManager.showCombatMessage(`${monster.type} hit you for 1 damage!`, '#ff4444');
                     const pushDirection = this.player.mesh.position.clone().sub(monster.mesh.position).normalize();
                     this.player.mesh.position.add(pushDirection.multiplyScalar(0.2)); // Stronger push
                     // Check for game over
@@ -791,8 +835,8 @@ export class Game {
                  if (!this.player.isInvulnerable) {
                     this.player.takeDamage(1);
                     this.audioManager.playSound('playerHit');
-                    proj.expire(); // Remove projectile after hit
-                    // Optional: knockback from projectile hit
+                    this.uiManager.showDamageNumber(1, this.player.mesh.position, 'damage');
+                    proj.expire();
                     const pushDirection = this.player.mesh.position.clone().sub(proj.mesh.position).normalize();
                     this.player.mesh.position.add(pushDirection.multiplyScalar(0.1));
                     if (!this.player.isAlive()) {
@@ -994,7 +1038,10 @@ export class Game {
         this.animate();
     }
     updateSpriteAnimations(animationTime) {
-        // Update player sprite animation
+        // Throttle decoration animations to every 4th frame for performance
+        const updateDecorations = (this._spriteAnimFrame = (this._spriteAnimFrame || 0) + 1) % 4 === 0;
+        
+        // Update player sprite animation (every frame - important for responsiveness)
         if (this.player.mesh.updateAnimation) {
             this.player.mesh.updateAnimation(animationTime);
         }
@@ -1006,22 +1053,8 @@ export class Game {
             }
         }
         
-        // Update projectile animations
-        for (const proj of this.projectiles) {
-            if (proj.mesh.updateAnimation) {
-                proj.mesh.updateAnimation(animationTime);
-            }
-        }
-        
-        // Update monster projectile animations
-        for (const proj of this.monsterProjectiles) {
-            if (proj.mesh.updateAnimation) {
-                proj.mesh.updateAnimation(animationTime);
-            }
-        }
-        
-        // Update world decoration animations
-        if (this.world.decorations) {
+        // Decorations are purely cosmetic - update less frequently
+        if (updateDecorations && this.world.decorations) {
             for (const decoration of this.world.decorations) {
                 if (decoration.updateAnimation) {
                     decoration.updateAnimation(animationTime);
@@ -1221,8 +1254,9 @@ export class Game {
             this.player.mesh.position.set(0, this.player.size / 2, -25);
         }
         
-        // Update UI
+        // Update UI and music
         this.uiManager.updateBiome(region);
+        this.audioManager.setBiome(region);
         console.log("Successfully traveled to:", region);
     }
     
@@ -1258,8 +1292,9 @@ export class Game {
             // Get interaction data from NPC
             const interactionData = nearbyNPC.interact(this.player);
             
-            // Create interaction particle effect
+            // Create interaction particle effect and sound
             this.particleSystem.createEffect('npcInteract', nearbyNPC.position);
+            this.audioManager.playSound('npcGreet');
             
             // Start dialogue with the nearby NPC
             this.dialogueSystem.startDialogue(nearbyNPC, interactionData);
@@ -1558,8 +1593,9 @@ export class Game {
             description: `Gathered from ${currentBiome}`
         });
         
-        // Visual feedback
+        // Visual and audio feedback
         this.particleSystem.createEffect('pickup', playerPos);
+        this.audioManager.playSound('itemPickup');
         console.log(`Gathered ${amount} ${availableResource.type} from ${currentBiome}`);
         
         // Update UI

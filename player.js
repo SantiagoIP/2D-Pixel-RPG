@@ -183,6 +183,25 @@ export class Player {
         this.interactionRadius = 2.0; // Increased for better usability
         this.damageNumbers = []; // For floating damage numbers
         
+        // Dodge/roll mechanics
+        this.canDodge = true;
+        this.isDodging = false;
+        this.dodgeCooldown = 1.0; // seconds
+        this.dodgeCooldownTimer = 0;
+        this.dodgeDuration = 0.25; // seconds
+        this.dodgeTimer = 0;
+        this.dodgeSpeed = 12;
+        this.dodgeDirection = new THREE.Vector3();
+        this.staminaMax = 100;
+        this.stamina = this.staminaMax;
+        this.staminaRegenRate = 25; // per second
+        this.dodgeStaminaCost = 30;
+        
+        // Health regeneration (slow out-of-combat regen)
+        this.healthRegenRate = 0.3; // HP per second
+        this.lastCombatTime = 0;
+        this.outOfCombatRegenDelay = 5.0; // seconds before regen kicks in
+        
         // Status effect indicators
         this.statusEffects = {
             poisoned: { active: false, duration: 0, damage: 0 },
@@ -300,6 +319,7 @@ export class Player {
         this.isInvulnerable = true;
         this.invulnerabilityTimer = this.invulnerabilityDuration;
         this.lastHitTime = performance.now() / 1000;
+        this.lastCombatTime = this.lastHitTime; // Track for health regen
         
         if (totalDefense > 0) {
             console.log(`Player took ${amount} damage (${originalAmount} - ${totalDefense} defense), HP left: ${this.currentHealth}`);
@@ -428,20 +448,19 @@ export class Player {
 
         const keys = this.inputHandler.keys;
 
-        // Vertical movement (Arrow Keys Only for AZERTY compatibility)
-        if (keys['ArrowUp']) {
+        // Movement: Arrow Keys + WASD support
+        if (keys['ArrowUp'] || keys['KeyW']) {
             this.velocity.z = -1;
             this.moveDirection.z = -1;
-        } else if (keys['ArrowDown']) {
+        } else if (keys['ArrowDown'] || keys['KeyS']) {
             this.velocity.z = 1;
             this.moveDirection.z = 1;
         }
         
-        // Horizontal movement (Arrow Keys Only for AZERTY compatibility)
-        if (keys['ArrowLeft']) {
+        if (keys['ArrowLeft'] || keys['KeyA']) {
             this.velocity.x = -1;
             this.moveDirection.x = -1;
-        } else if (keys['ArrowRight']) {
+        } else if (keys['ArrowRight'] || keys['KeyD']) {
             this.velocity.x = 1;
             this.moveDirection.x = 1;
         }
@@ -516,17 +535,43 @@ export class Player {
     update(deltaTime, obstacles, worldSize, worldCenter = new THREE.Vector3(0,0,0), world, questManager, inventorySystem) {
         if (!this.isAlive()) return;
 
-        // Calculate movement and apply to position
-        const velocity = this.handleMovement(deltaTime);
+        // Update dodge cooldown
+        if (this.dodgeCooldownTimer > 0) {
+            this.dodgeCooldownTimer -= deltaTime;
+        }
         
-        // Apply movement with collision detection
-        if (velocity.lengthSq() > 0) {
-            const potentialPosition = this.mesh.position.clone().add(velocity);
+        // Handle dodge roll
+        if (this.isDodging) {
+            this.dodgeTimer -= deltaTime;
+            const dodgeVelocity = this.dodgeDirection.clone().multiplyScalar(this.dodgeSpeed * deltaTime);
+            const potentialPos = this.mesh.position.clone().add(dodgeVelocity);
+            if (!this.checkCollision(potentialPos, obstacles, worldSize, worldCenter)) {
+                this.mesh.position.add(dodgeVelocity);
+            }
+            this.isInvulnerable = true; // Invulnerable during dodge
+            if (this.dodgeTimer <= 0) {
+                this.isDodging = false;
+                this.isInvulnerable = false;
+                this.invulnerabilityTimer = 0.15; // Brief i-frames after dodge
+            }
+        } else {
+            // Normal movement
+            const velocity = this.handleMovement(deltaTime);
             
-            // Check for collisions before moving
-            if (!this.checkCollision(potentialPosition, obstacles, worldSize, worldCenter)) {
-                const oldPosition = this.mesh.position.clone();
-                this.mesh.position.add(velocity);
+            if (velocity.lengthSq() > 0) {
+                const potentialPosition = this.mesh.position.clone().add(velocity);
+                if (!this.checkCollision(potentialPosition, obstacles, worldSize, worldCenter)) {
+                    this.mesh.position.add(velocity);
+                }
+            }
+        }
+        
+        // Check for dodge input
+        if (this.inputHandler && this.inputHandler.keys['ShiftLeft'] || this.inputHandler?.keys['ShiftRight']) {
+            this.tryDodge();
+            if (this.inputHandler) {
+                this.inputHandler.keys['ShiftLeft'] = false;
+                this.inputHandler.keys['ShiftRight'] = false;
             }
         }
         
@@ -538,7 +583,18 @@ export class Player {
             this.mana = Math.min(this.maxMana, this.mana + (this.manaRegenRate * deltaTime));
         }
         
-        if (this.isInvulnerable) {
+        // Stamina regeneration
+        if (this.stamina < this.staminaMax && !this.isDodging) {
+            this.stamina = Math.min(this.staminaMax, this.stamina + (this.staminaRegenRate * deltaTime));
+        }
+        
+        // Health regeneration (out of combat)
+        const timeSinceCombat = performance.now() / 1000 - this.lastCombatTime;
+        if (timeSinceCombat > this.outOfCombatRegenDelay && this.currentHealth < this.maxHealth && this.currentHealth > 0) {
+            this.currentHealth = Math.min(this.maxHealth, this.currentHealth + (this.healthRegenRate * deltaTime));
+        }
+        
+        if (this.isInvulnerable && !this.isDodging) {
             this.invulnerabilityTimer -= deltaTime;
             if (this.invulnerabilityTimer <= 0) {
                 this.isInvulnerable = false;
@@ -547,6 +603,28 @@ export class Player {
         
         if (world && questManager && inventorySystem) {
             this.checkForCollectibles(world, questManager, inventorySystem);
+        }
+    }
+    
+    tryDodge() {
+        if (!this.canDodge || this.isDodging || this.dodgeCooldownTimer > 0) return;
+        if (this.stamina < this.dodgeStaminaCost) return;
+        
+        this.stamina -= this.dodgeStaminaCost;
+        this.isDodging = true;
+        this.dodgeTimer = this.dodgeDuration;
+        this.dodgeCooldownTimer = this.dodgeCooldown;
+        
+        // Dodge in the direction of current movement, or facing direction
+        if (this.moveDirection.lengthSq() > 0) {
+            this.dodgeDirection.copy(this.moveDirection).normalize();
+        } else {
+            this.dodgeDirection.set(0, 0, -1); // Default: dodge forward
+        }
+        
+        // Visual dodge effect
+        if (this.particleSystem) {
+            this.particleSystem.createEffect('dodge', this.mesh.position);
         }
     }
 
