@@ -741,6 +741,18 @@ export class Game {
             const lerpFactor = Math.min(0.1, 0.05 + camDist * 0.001); // Faster catch-up when far
             this.camera.position.lerp(targetPosition, lerpFactor);
         }
+        // Low-health warning effect
+        if (this.player.currentHealth <= this.player.maxHealth * 0.3 && this.player.currentHealth > 0) {
+            const pulse = (Math.sin(performance.now() / 300) + 1) / 2;
+            if (this.uiManager.vignetteOverlay) {
+                this.uiManager.vignetteOverlay.style.background = `radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(180,0,0,${0.15 + pulse * 0.2}) 100%)`;
+            }
+        } else {
+            if (this.uiManager.vignetteOverlay) {
+                this.uiManager.vignetteOverlay.style.background = 'radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%)';
+            }
+        }
+        
         // Day/night cycle overlay
         const dayTime = (performance.now() / 1000) % 20;
         // 0-10 = day, 10-20 = night
@@ -1280,8 +1292,9 @@ export class Game {
             // Get interaction data from NPC
             const interactionData = nearbyNPC.interact(this.player);
             
-            // Create interaction particle effect
+            // Create interaction particle effect and sound
             this.particleSystem.createEffect('npcInteract', nearbyNPC.position);
+            this.audioManager.playSound('npcGreet');
             
             // Start dialogue with the nearby NPC
             this.dialogueSystem.startDialogue(nearbyNPC, interactionData);
@@ -1580,8 +1593,9 @@ export class Game {
             description: `Gathered from ${currentBiome}`
         });
         
-        // Visual feedback
+        // Visual and audio feedback
         this.particleSystem.createEffect('pickup', playerPos);
+        this.audioManager.playSound('itemPickup');
         console.log(`Gathered ${amount} ${availableResource.type} from ${currentBiome}`);
         
         // Update UI

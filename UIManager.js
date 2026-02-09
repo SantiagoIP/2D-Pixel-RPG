@@ -795,6 +795,16 @@ export class UIManager {
                 background: #f44336;
             }
             
+            @keyframes notifSlideIn {
+                0% { transform: translateX(120%); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes notifSlideOut {
+                0% { transform: translateX(0); opacity: 1; }
+                100% { transform: translateX(120%); opacity: 0; }
+            }
+            
             @keyframes damageFloat {
                 0% { opacity: 1; transform: translateY(0) scale(1); }
                 20% { opacity: 1; transform: translateY(-15px) scale(1.2); }
@@ -2002,30 +2012,57 @@ export class UIManager {
     }
 
     showNotification(message, type = 'info') {
+        const colors = {
+            'error': 'linear-gradient(135deg, #f44336, #d32f2f)',
+            'success': 'linear-gradient(135deg, #4caf50, #388e3c)',
+            'info': 'linear-gradient(135deg, #2196f3, #1976d2)',
+            'warning': 'linear-gradient(135deg, #ff9800, #f57c00)',
+            'resource': 'linear-gradient(135deg, #9c27b0, #7b1fa2)',
+            'quest': 'linear-gradient(135deg, #ff5722, #e64a19)'
+        };
+        
+        const icons = {
+            'error': '❌',
+            'success': '✅',
+            'info': 'ℹ️',
+            'warning': '⚠️',
+            'resource': '🌿',
+            'quest': '📜'
+        };
+        
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : '#2196f3'};
+            top: ${20 + (this._notifStack || 0) * 55}px;
+            right: 20px;
+            background: ${colors[type] || colors.info};
             color: white;
-            padding: 15px 25px;
-            border-radius: 4px;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 10px;
+            padding: 14px 22px;
+            border-radius: 10px;
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+            font-size: 0.9rem;
             z-index: 2000;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255,255,255,0.1) inset;
+            border: 2px solid rgba(255,255,255,0.2);
+            animation: notifSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 350px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         `;
-        notification.textContent = message;
+        notification.innerHTML = `<span style="font-size:1.2em;">${icons[type] || icons.info}</span><span>${message}</span>`;
         
         document.body.appendChild(notification);
+        this._notifStack = (this._notifStack || 0) + 1;
         
         setTimeout(() => {
-            if (notification.parentNode) {
-                document.body.removeChild(notification);
-            }
-        }, 2000);
+            notification.style.animation = 'notifSlideOut 0.3s ease-in forwards';
+            setTimeout(() => {
+                if (notification.parentNode) notification.remove();
+                this._notifStack = Math.max(0, (this._notifStack || 1) - 1);
+            }, 300);
+        }, 2500);
     }
 
     // Floating damage numbers - shown over the game canvas

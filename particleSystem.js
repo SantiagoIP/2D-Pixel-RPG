@@ -221,6 +221,66 @@ export class ParticleSystem {
                 drag: 0.97,
                 elevationRange: [0, Math.PI]
             },
+            dodge: {
+                count: 25,
+                colors: ['#87CEEB', '#B0E0E6', '#FFFFFF', '#E0FFFF'],
+                sizeRange: [3, 7],
+                speedRange: [4, 8],
+                lifeRange: [0.3, 0.6],
+                gravity: 0,
+                drag: 0.92,
+                elevationRange: [0, Math.PI]
+            },
+            pickup: {
+                count: 20,
+                colors: ['#FFD700', '#FFEC8B', '#FFFFFF'],
+                sizeRange: [4, 8],
+                speedRange: [2, 5],
+                lifeRange: [0.5, 1.0],
+                gravity: -1,
+                drag: 0.96,
+                elevationRange: [Math.PI/4, 3*Math.PI/4]
+            },
+            shrineActivate: {
+                count: 80,
+                colors: ['#9400D3', '#BA55D3', '#EE82EE', '#FFD700', '#FFFFFF'],
+                sizeRange: [5, 14],
+                speedRange: [3, 8],
+                lifeRange: [1.5, 3.0],
+                gravity: -0.5,
+                drag: 0.97,
+                elevationRange: [0, Math.PI]
+            },
+            npcInteract: {
+                count: 15,
+                colors: ['#00BFFF', '#87CEEB', '#FFFFFF'],
+                sizeRange: [3, 6],
+                speedRange: [1, 3],
+                lifeRange: [0.5, 1.0],
+                gravity: -1,
+                drag: 0.98,
+                elevationRange: [Math.PI/4, 3*Math.PI/4]
+            },
+            attackHit: {
+                count: 20,
+                colors: ['#FFFFFF', '#FFD700', '#FF6B6B'],
+                sizeRange: [3, 7],
+                speedRange: [3, 7],
+                lifeRange: [0.2, 0.5],
+                gravity: 1,
+                drag: 0.94,
+                elevationRange: [-Math.PI/4, Math.PI/4]
+            },
+            monsterDefeat: {
+                count: 50,
+                colors: ['#FF4444', '#FF8888', '#FFD700', '#FFFFFF'],
+                sizeRange: [5, 12],
+                speedRange: [4, 10],
+                lifeRange: [0.8, 1.5],
+                gravity: 2,
+                drag: 0.93,
+                elevationRange: [0, Math.PI]
+            },
             weaponPickup: {
                 count: 45,
                 colors: ['#C0C0C0', '#FFD700', '#FF6347', '#87CEEB'],

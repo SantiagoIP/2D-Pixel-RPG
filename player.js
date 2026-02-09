@@ -622,9 +622,9 @@ export class Player {
             this.dodgeDirection.set(0, 0, -1); // Default: dodge forward
         }
         
-        // Visual effect
+        // Visual dodge effect
         if (this.particleSystem) {
-            this.particleSystem.createEffect('playerHit', this.mesh.position);
+            this.particleSystem.createEffect('dodge', this.mesh.position);
         }
     }
 
