@@ -618,26 +618,38 @@ export class Game {
                 const collisionThreshold = Math.pow((monster.size + proj.size) / 2, 2);
                 if (distanceSquared < collisionThreshold) {
                      // Hit detected!
-                    monster.takeDamage(proj.damage); // Use projectile's damage instead of player's base damage
+                    monster.takeDamage(proj.damage);
                     hit = true;
-                    proj.expire(); // Remove projectile after hit
-                    this.audioManager.playSound('monsterHit'); // Play monster hit sound
+                    proj.expire();
+                    this.audioManager.playSound('monsterHit');
                     
-                    // Enhanced hit effects based on attack type
+                    // Show floating damage numbers
                     if (proj.isCritical) {
-                        this.particleSystem.createEffect('monsterDefeat', monster.mesh.position); // Bigger effect for crits
+                        this.particleSystem.createEffect('monsterDefeat', monster.mesh.position);
+                        this.uiManager.showDamageNumber(Math.round(proj.damage), monster.mesh.position, 'critical');
+                        this.audioManager.playSound('criticalHit');
+                        this.uiManager.showCombatMessage(`Critical hit! ${Math.round(proj.damage)} damage!`, '#ffd700');
                     } else {
                         this.particleSystem.createEffect('monsterHit', monster.mesh.position);
+                        this.uiManager.showDamageNumber(Math.round(proj.damage), monster.mesh.position, 'damage');
                     }
                     
                     if (!monster.isAlive()) {
-                        this.score += 10; // Add to score
-                        const leveledUp = this.player.addExperience(10); // Grant XP to player
+                        const goldReward = 10 + Math.floor(Math.random() * 5);
+                        const xpReward = 10 + Math.floor(Math.random() * 5);
+                        this.score += goldReward;
+                        const leveledUp = this.player.addExperience(xpReward);
                         if (leveledUp) {
                             this.handleLevelUp();
                         }
-                        this.uiManager.playerGold = this.score; // Sync playerGold with score
-        this.uiManager.updateScore(this.score); // Update UI
+                        this.uiManager.playerGold = this.score;
+                        this.uiManager.updateScore(this.score);
+                        
+                        // Show rewards
+                        this.uiManager.showDamageNumber(goldReward, monster.mesh.position, 'gold');
+                        setTimeout(() => this.uiManager.showDamageNumber(xpReward, monster.mesh.position, 'xp'), 200);
+                        this.audioManager.playSound('monsterDefeat');
+                        this.uiManager.showCombatMessage(`Defeated ${monster.type}! +${goldReward}g +${xpReward}xp`, '#4caf50');
                         
                         // Handle quest objectives for monster kills
                         this.handleMonsterKillQuests(monster);
@@ -774,9 +786,10 @@ export class Game {
             const collisionThreshold = Math.pow((this.player.size + monster.size) / 2, 2);
             if (distanceSquared < collisionThreshold) {
                 if (!this.player.isInvulnerable) {
-                    this.player.takeDamage(1); // Player takes 1 damage from collision
-                    this.audioManager.playSound('playerHit'); // Play player hit sound
-                    // Optional: Player knockback
+                    this.player.takeDamage(1);
+                    this.audioManager.playSound('playerHit');
+                    this.uiManager.showDamageNumber(1, this.player.mesh.position, 'damage');
+                    this.uiManager.showCombatMessage(`${monster.type} hit you for 1 damage!`, '#ff4444');
                     const pushDirection = this.player.mesh.position.clone().sub(monster.mesh.position).normalize();
                     this.player.mesh.position.add(pushDirection.multiplyScalar(0.2)); // Stronger push
                     // Check for game over
@@ -796,8 +809,8 @@ export class Game {
                  if (!this.player.isInvulnerable) {
                     this.player.takeDamage(1);
                     this.audioManager.playSound('playerHit');
-                    proj.expire(); // Remove projectile after hit
-                    // Optional: knockback from projectile hit
+                    this.uiManager.showDamageNumber(1, this.player.mesh.position, 'damage');
+                    proj.expire();
                     const pushDirection = this.player.mesh.position.clone().sub(proj.mesh.position).normalize();
                     this.player.mesh.position.add(pushDirection.multiplyScalar(0.1));
                     if (!this.player.isAlive()) {

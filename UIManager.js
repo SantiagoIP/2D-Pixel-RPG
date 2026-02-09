@@ -794,6 +794,18 @@ export class UIManager {
             .notification.error {
                 background: #f44336;
             }
+            
+            @keyframes damageFloat {
+                0% { opacity: 1; transform: translateY(0) scale(1); }
+                20% { opacity: 1; transform: translateY(-15px) scale(1.2); }
+                100% { opacity: 0; transform: translateY(-60px) scale(0.7); }
+            }
+            
+            @keyframes combatLogFade {
+                0% { opacity: 1; }
+                70% { opacity: 0.7; }
+                100% { opacity: 0; }
+            }
         `;
         document.head.appendChild(style);
         const uiOverlay = document.createElement('div');
@@ -1171,19 +1183,107 @@ export class UIManager {
         }
     }
     showGameOver() {
-        const gameOverMessage = document.createElement('div');
-         gameOverMessage.textContent = 'GAME OVER';
-         gameOverMessage.style.position = 'absolute';
-         gameOverMessage.style.top = '50%';
-         gameOverMessage.style.left = '50%';
-         gameOverMessage.style.transform = 'translate(-50%, -50%)';
-         gameOverMessage.style.color = 'red';
-         gameOverMessage.style.fontSize = '48px';
-         gameOverMessage.style.fontWeight = 'bold';
-         gameOverMessage.style.textShadow = '2px 2px 4px black';
-         gameOverMessage.style.pointerEvents = 'none';
-         this.container.appendChild(gameOverMessage);
-     }
+        const overlay = document.createElement('div');
+        overlay.id = 'game-over-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(10, 0, 0, 0.92);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 2000;
+            animation: gameOverFadeIn 1.5s ease-out;
+            pointer-events: auto;
+            font-family: 'Cinzel', serif;
+        `;
+        
+        overlay.innerHTML = `
+            <style>
+                @keyframes gameOverFadeIn {
+                    0% { opacity: 0; }
+                    100% { opacity: 1; }
+                }
+                @keyframes gameOverTextGlow {
+                    0%, 100% { text-shadow: 0 0 20px #ff0000, 0 0 40px #880000, 3px 3px 6px #000; }
+                    50% { text-shadow: 0 0 40px #ff3333, 0 0 80px #cc0000, 3px 3px 8px #000; }
+                }
+                @keyframes skullBob {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-8px); }
+                }
+            </style>
+            <div style="font-size: 5rem; margin-bottom: 20px; animation: skullBob 2s ease-in-out infinite;">💀</div>
+            <h1 style="
+                font-size: 3.5rem; color: #dc3545; margin: 0 0 15px 0;
+                font-family: 'Uncial Antiqua', cursive;
+                animation: gameOverTextGlow 3s ease-in-out infinite;
+            ">YOU HAVE FALLEN</h1>
+            <p style="color: #e6d5a8; font-size: 1.1rem; margin: 0 0 10px 0; opacity: 0.8;">
+                The realm mourns another hero lost to the darkness...
+            </p>
+            <p id="death-stats" style="color: #aaa; font-size: 0.85rem; margin: 0 0 40px 0; opacity: 0.6;"></p>
+            <div style="display: flex; gap: 20px;">
+                <button id="respawn-btn" style="
+                    background: linear-gradient(135deg, #dc3545, #a71d2a);
+                    border: 3px solid #ffd700; color: white;
+                    padding: 18px 40px; border-radius: 12px;
+                    font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.2rem;
+                    cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+                ">Rise Again</button>
+                <button id="quit-btn" style="
+                    background: linear-gradient(135deg, #555, #333);
+                    border: 3px solid #888; color: #ccc;
+                    padding: 18px 40px; border-radius: 12px;
+                    font-family: 'Cinzel', serif; font-weight: 600; font-size: 1rem;
+                    cursor: pointer; transition: all 0.3s ease;
+                ">Return to Menu</button>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Populate death stats
+        if (window.game) {
+            const stats = document.getElementById('death-stats');
+            const playTime = Math.floor((Date.now() - (window.game.gameStartTime || Date.now())) / 1000);
+            const minutes = Math.floor(playTime / 60);
+            const seconds = playTime % 60;
+            stats.textContent = `Level ${window.game.player?.level || 1} | Gold: ${window.game.score || 0} | Time: ${minutes}m ${seconds}s`;
+        }
+        
+        // Button handlers
+        document.getElementById('respawn-btn').addEventListener('click', () => {
+            overlay.remove();
+            if (window.game) {
+                window.game.isGameOver = false;
+                window.game.player.currentHealth = window.game.player.maxHealth;
+                window.game.player.mana = window.game.player.maxMana;
+                window.game.player.mesh.position.set(0, window.game.player.size / 2, -25);
+                window.game.player.isInvulnerable = true;
+                window.game.player.invulnerabilityTimer = 3.0;
+                // Clear monsters near spawn
+                window.game.monsters.forEach(m => { window.game.scene.remove(m.mesh); m.dispose(); });
+                window.game.monsters = [];
+            }
+        });
+        
+        document.getElementById('quit-btn').addEventListener('click', () => {
+            window.location.reload();
+        });
+        
+        // Hover effects
+        const respawnBtn = document.getElementById('respawn-btn');
+        respawnBtn.addEventListener('mouseenter', () => {
+            respawnBtn.style.transform = 'scale(1.05)';
+            respawnBtn.style.boxShadow = '0 6px 25px rgba(220, 53, 69, 0.6)';
+        });
+        respawnBtn.addEventListener('mouseleave', () => {
+            respawnBtn.style.transform = 'scale(1)';
+            respawnBtn.style.boxShadow = '0 4px 15px rgba(220, 53, 69, 0.4)';
+        });
+    }
     showLevelUpUI(upgradeOptions, onSelectCallback) {
         this.hideLevelUpUI(); // Ensure no duplicates
         this.levelUpContainer = document.createElement('div');
@@ -1882,8 +1982,84 @@ export class UIManager {
         }, 2000);
     }
 
+    // Floating damage numbers - shown over the game canvas
+    showDamageNumber(amount, position, type = 'damage') {
+        const floater = document.createElement('div');
+        const colors = {
+            'damage': '#ff4444',
+            'heal': '#44ff44',
+            'critical': '#ffd700',
+            'xp': '#87ceeb',
+            'gold': '#ffeb3b',
+            'miss': '#aaaaaa',
+            'mana': '#4488ff'
+        };
+        
+        const color = colors[type] || colors.damage;
+        const isCrit = type === 'critical';
+        const text = type === 'miss' ? 'MISS' : 
+                     type === 'xp' ? `+${amount} XP` : 
+                     type === 'gold' ? `+${amount} G` :
+                     type === 'heal' ? `+${amount}` :
+                     type === 'mana' ? `+${amount} MP` :
+                     `${amount}`;
+        
+        floater.textContent = text;
+        floater.style.cssText = `
+            position: fixed;
+            left: ${50 + (Math.random() - 0.5) * 10}%;
+            top: ${40 + (Math.random() - 0.5) * 10}%;
+            color: ${color};
+            font-family: 'Press Start 2P', monospace;
+            font-size: ${isCrit ? '1.8em' : '1.2em'};
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 1800;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 10px ${color}40;
+            animation: damageFloat 1.2s ease-out forwards;
+        `;
+        
+        document.body.appendChild(floater);
+        setTimeout(() => { if (floater.parentNode) floater.remove(); }, 1200);
+    }
+    
+    // Show a combat log message (bottom-left area)
+    showCombatMessage(message, color = '#fff') {
+        if (!this.combatLog) {
+            this.combatLog = document.createElement('div');
+            this.combatLog.style.cssText = `
+                position: fixed; bottom: 100px; left: 20px;
+                max-width: 300px; max-height: 150px;
+                overflow-y: hidden; pointer-events: none;
+                z-index: 15; font-family: 'Press Start 2P', monospace;
+                font-size: 0.55em; display: flex; flex-direction: column-reverse;
+            `;
+            document.body.appendChild(this.combatLog);
+        }
+        
+        const entry = document.createElement('div');
+        entry.textContent = message;
+        entry.style.cssText = `
+            color: ${color}; margin-bottom: 3px; opacity: 1;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+            animation: combatLogFade 4s ease-out forwards;
+        `;
+        
+        this.combatLog.prepend(entry);
+        
+        // Keep only last 5 messages
+        while (this.combatLog.children.length > 5) {
+            this.combatLog.removeChild(this.combatLog.lastChild);
+        }
+        
+        setTimeout(() => { if (entry.parentNode) entry.remove(); }, 4000);
+    }
+
     // Call this when destroying the UIManager instance
     destroy() {
         this.clearAllTimers();
+        if (this.combatLog && this.combatLog.parentNode) {
+            this.combatLog.remove();
+        }
     }
 }
