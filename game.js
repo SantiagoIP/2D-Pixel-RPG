@@ -733,10 +733,14 @@ export class Game {
         // Get NPC positions for minimap
         const npcPositions = this.npcManager.getActiveNPCs().map(npc => npc.position);
         this.uiManager.updateMinimap(this.player.mesh.position, this.world.worldSize, this.world.castlePosition, monsterPositions, npcPositions);
-       // Make camera follow player smoothly
+       // Make camera follow player smoothly (adaptive lerp speed based on distance)
         const targetPosition = this.player.mesh.position.clone();
-        targetPosition.y = this.camera.position.y; // Maintain camera height
-        this.camera.position.lerp(targetPosition, 0.05); // Smooth interpolation
+        targetPosition.y = this.camera.position.y;
+        const camDist = this.camera.position.distanceToSquared(targetPosition);
+        if (camDist > 0.001) { // Only update if camera needs to move
+            const lerpFactor = Math.min(0.1, 0.05 + camDist * 0.001); // Faster catch-up when far
+            this.camera.position.lerp(targetPosition, lerpFactor);
+        }
         // Day/night cycle overlay
         const dayTime = (performance.now() / 1000) % 20;
         // 0-10 = day, 10-20 = night
@@ -1022,7 +1026,10 @@ export class Game {
         this.animate();
     }
     updateSpriteAnimations(animationTime) {
-        // Update player sprite animation
+        // Throttle decoration animations to every 4th frame for performance
+        const updateDecorations = (this._spriteAnimFrame = (this._spriteAnimFrame || 0) + 1) % 4 === 0;
+        
+        // Update player sprite animation (every frame - important for responsiveness)
         if (this.player.mesh.updateAnimation) {
             this.player.mesh.updateAnimation(animationTime);
         }
@@ -1034,22 +1041,8 @@ export class Game {
             }
         }
         
-        // Update projectile animations
-        for (const proj of this.projectiles) {
-            if (proj.mesh.updateAnimation) {
-                proj.mesh.updateAnimation(animationTime);
-            }
-        }
-        
-        // Update monster projectile animations
-        for (const proj of this.monsterProjectiles) {
-            if (proj.mesh.updateAnimation) {
-                proj.mesh.updateAnimation(animationTime);
-            }
-        }
-        
-        // Update world decoration animations
-        if (this.world.decorations) {
+        // Decorations are purely cosmetic - update less frequently
+        if (updateDecorations && this.world.decorations) {
             for (const decoration of this.world.decorations) {
                 if (decoration.updateAnimation) {
                     decoration.updateAnimation(animationTime);

@@ -291,12 +291,15 @@ export class ParticleSystem {
             this.sizes[j] = 0;
         }
 
-        this.geometry.attributes.position.needsUpdate = true;
-        this.geometry.attributes.color.needsUpdate = true;
-        this.geometry.attributes.alpha.needsUpdate = true;
-        this.geometry.attributes.size.needsUpdate = true;
-        
-        this.geometry.computeBoundingSphere();
+        // Only mark attributes dirty and recompute bounds when there are active particles
+        if (activeCount > 0 || this._hadParticlesLastFrame) {
+            this.geometry.attributes.position.needsUpdate = true;
+            this.geometry.attributes.color.needsUpdate = true;
+            this.geometry.attributes.alpha.needsUpdate = true;
+            this.geometry.attributes.size.needsUpdate = true;
+            this.geometry.computeBoundingSphere();
+        }
+        this._hadParticlesLastFrame = activeCount > 0;
     }
     
     dispose() {

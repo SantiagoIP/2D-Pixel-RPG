@@ -1012,28 +1012,46 @@ export class UIManager {
     }
     updatePlayerHealth(currentHealth, maxHealth) {
         if (this.healthBarFill && this.healthText) {
+            const roundedHealth = Math.max(0, Math.round(currentHealth * 10) / 10);
+            // Only update DOM when value actually changes (avoid costly reflows)
+            if (this._lastHealthDisplay === roundedHealth && this._lastMaxHealth === maxHealth) return;
+            this._lastHealthDisplay = roundedHealth;
+            this._lastMaxHealth = maxHealth;
+            
             const healthPercentage = (currentHealth / maxHealth) * 100;
-            // Flash effect when health changes
-            this.healthBarFill.classList.remove('hp-flash');
-            void this.healthBarFill.offsetWidth; // Force reflow
-            this.healthBarFill.classList.add('hp-flash');
+            
+            // Flash effect only when health decreases significantly
+            if (this.lastHealth !== undefined && roundedHealth < this.lastHealth - 0.5) {
+                this.healthBarFill.classList.remove('hp-flash');
+                void this.healthBarFill.offsetWidth;
+                this.healthBarFill.classList.add('hp-flash');
+            }
+            this.lastHealth = roundedHealth;
             
             this.healthBarFill.style.width = `${healthPercentage}%`;
-            this.healthText.innerHTML = `<span class='pixel-heart'></span> ${Math.max(0, currentHealth)} / ${maxHealth}`;
+            this.healthText.innerHTML = `<span class='pixel-heart'></span> ${Math.floor(roundedHealth)} / ${maxHealth}`;
         }
     }
     updateMana(currentMana, maxMana) {
         if (this.manaBarFill && this.manaText) {
+            const roundedMana = Math.floor(currentMana);
+            if (this._lastManaDisplay === roundedMana) return;
+            this._lastManaDisplay = roundedMana;
+            
             const manaPercentage = (currentMana / maxMana) * 100;
             this.manaBarFill.style.width = `${manaPercentage}%`;
-            this.manaText.innerHTML = `<span class='pixel-star'>✦</span> ${Math.floor(currentMana)} / ${maxMana}`;
+            this.manaText.innerHTML = `<span class='pixel-star'>✦</span> ${roundedMana} / ${maxMana}`;
         }
     }
     updateStamina(currentStamina, maxStamina) {
         if (this.staminaBarFill && this.staminaText) {
+            const rounded = Math.floor(currentStamina);
+            if (this._lastStaminaDisplay === rounded) return;
+            this._lastStaminaDisplay = rounded;
+            
             const staminaPercentage = (currentStamina / maxStamina) * 100;
             this.staminaBarFill.style.width = `${staminaPercentage}%`;
-            this.staminaText.innerHTML = `<span style="color:#28a745;">⚡</span> ${Math.floor(currentStamina)} / ${maxStamina}`;
+            this.staminaText.innerHTML = `<span style="color:#28a745;">⚡</span> ${rounded} / ${maxStamina}`;
         }
     }
     updateExperience(level, currentXP, xpToNextLevel) {
@@ -1124,6 +1142,12 @@ export class UIManager {
     }
     updateMinimap(playerPosition, worldSize, castlePosition, monsterPositions = [], npcPositions = []) {
         if (!this.minimapContainer) return;
+        
+        // Throttle minimap updates to every 3 frames for performance
+        if (!this._minimapFrame) this._minimapFrame = 0;
+        this._minimapFrame++;
+        if (this._minimapFrame % 3 !== 0) return;
+        
         const mapWidth = this.minimapContainer.clientWidth;
         const mapHeight = this.minimapContainer.clientHeight;
         
