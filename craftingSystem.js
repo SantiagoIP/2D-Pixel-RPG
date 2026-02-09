@@ -430,10 +430,23 @@ export class CraftingSystem {
         if (!this.biomeResources) {
             this.initializeBiomeResources();
         }
-        
+
+        const normalizedBiome = this.normalizeBiomeName(biomeName);
         return this.biomeResources.filter(resource => 
-            resource.biomes.includes(biomeName)
+            resource.biomes.includes(normalizedBiome)
         );
+    }
+
+    normalizeBiomeName(biomeName) {
+        if (!biomeName) return 'Green Hills';
+        if (biomeName.includes('_')) {
+            return biomeName
+                .toLowerCase()
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+        return biomeName;
     }
     
     initializeBiomeResources() {

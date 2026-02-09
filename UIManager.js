@@ -412,6 +412,47 @@ export class UIManager {
                 border: 1px solid var(--ui-border-accent);
             }
 
+            .buff-tooltip {
+                position: absolute;
+                right: 60px;
+                top: 0;
+                background: rgba(0, 0, 0, 0.85);
+                color: #fff;
+                padding: 8px 10px;
+                border-radius: 6px;
+                border: 1px solid var(--ui-border-accent);
+                font-size: 0.55em;
+                line-height: 1.4;
+                white-space: nowrap;
+                opacity: 0;
+                pointer-events: none;
+                transform: translateY(-4px);
+                transition: opacity 0.2s ease, transform 0.2s ease;
+                z-index: 50;
+            }
+
+            .buff-icon:hover .buff-tooltip {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            .pixel-star {
+                color: var(--ui-mana-color);
+                text-shadow: 0 0 8px rgba(0, 123, 255, 0.7);
+                margin-right: 6px;
+            }
+
+            .low-health {
+                animation: lowHealthPulse 1.2s ease-in-out infinite;
+                box-shadow: 0 0 20px rgba(220, 53, 69, 0.8);
+            }
+
+            @keyframes lowHealthPulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.02); }
+                100% { transform: scale(1); }
+            }
+
             button, input, select {
                 font-family: 'Cinzel', serif !important;
                 image-rendering: auto;
@@ -571,6 +612,26 @@ export class UIManager {
             }
             .pause-menu button:hover {
                 background: #fffbe6; color: #181818; transform: scale(1.05);
+            }
+
+            .pause-audio {
+                width: 100%;
+                display: grid;
+                gap: 12px;
+                margin-top: 8px;
+                font-size: 0.7em;
+            }
+
+            .pause-audio label {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+            }
+
+            .pause-audio input[type="range"] {
+                flex: 1;
+                accent-color: #ffd700;
             }
             .bestiary-overlay, .biome-info-overlay {
                 position: absolute; left: 0; top: 0; width: 100vw; height: 100vh;
@@ -993,6 +1054,9 @@ export class UIManager {
             
             this.healthBarFill.style.width = `${healthPercentage}%`;
             this.healthText.innerHTML = `<span class='pixel-heart'></span> ${Math.max(0, currentHealth)} / ${maxHealth}`;
+            if (this.healthDisplayContainer) {
+                this.healthDisplayContainer.classList.toggle('low-health', healthPercentage <= 30);
+            }
         }
     }
     updateMana(currentMana, maxMana) {
@@ -1078,6 +1142,8 @@ export class UIManager {
                         // Show progress if objective has current/target values
                         if (obj.current !== undefined && obj.target !== undefined) {
                             objText += ` (${obj.current}/${obj.target})`;
+                        } else if (obj.progress !== undefined && obj.required !== undefined) {
+                            objText += ` (${Math.floor(obj.progress)}/${obj.required})`;
                         }
                         
                         questHTML += `<div style="color: ${color}; font-size: 0.4em; margin-left: 8px;">${status} ${objText}</div>`;
@@ -1439,12 +1505,28 @@ export class UIManager {
         this.activeTimers.push(timerId);
     }
     showPauseMenu(onResume, onBestiary, onBiomes, onQuit) {
+        const audioManager = window.game?.audioManager;
+        const musicValue = Math.round((audioManager?.getMusicVolume?.() ?? 0.6) * 100);
+        const sfxValue = Math.round((audioManager?.getSfxVolume?.() ?? 0.7) * 100);
+
         this.pauseMenuOverlay.innerHTML = `
             <div class='pause-menu'>
                 <div style='font-size:2em; margin-bottom:16px;'>⏸️ PAUSED</div>
                 <button id='resume-btn'>Resume</button>
                 <button id='bestiary-btn'>Bestiary / FAQ</button>
                 <button id='biomes-btn'>Biomes</button>
+                <div class='pause-audio'>
+                    <label>
+                        Music Volume
+                        <input id="music-volume" type="range" min="0" max="100" value="${musicValue}">
+                        <span id="music-volume-label">${musicValue}%</span>
+                    </label>
+                    <label>
+                        SFX Volume
+                        <input id="sfx-volume" type="range" min="0" max="100" value="${sfxValue}">
+                        <span id="sfx-volume-label">${sfxValue}%</span>
+                    </label>
+                </div>
                 <button id='quit-btn'>Quit</button>
             </div>
         `;
@@ -1453,6 +1535,27 @@ export class UIManager {
         document.getElementById('bestiary-btn').onclick = () => { this.showBestiary(onBestiary); };
         document.getElementById('biomes-btn').onclick = () => { this.showBiomeSelectionMenu(onBiomes); };
         document.getElementById('quit-btn').onclick = () => { if (onQuit) onQuit(); };
+
+        const musicSlider = document.getElementById('music-volume');
+        const sfxSlider = document.getElementById('sfx-volume');
+        const musicLabel = document.getElementById('music-volume-label');
+        const sfxLabel = document.getElementById('sfx-volume-label');
+
+        if (musicSlider && audioManager) {
+            musicSlider.addEventListener('input', (event) => {
+                const value = Number(event.target.value) / 100;
+                audioManager.setMusicVolume(value);
+                if (musicLabel) musicLabel.textContent = `${Math.round(value * 100)}%`;
+            });
+        }
+
+        if (sfxSlider && audioManager) {
+            sfxSlider.addEventListener('input', (event) => {
+                const value = Number(event.target.value) / 100;
+                audioManager.setSfxVolume(value);
+                if (sfxLabel) sfxLabel.textContent = `${Math.round(value * 100)}%`;
+            });
+        }
     }
     showBestiary(onClose) {
         // Example bestiary data (replace with your monsters)
@@ -1862,7 +1965,7 @@ export class UIManager {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : '#2196f3'};
+            background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : type === 'warning' ? '#ff9800' : type === 'resource' ? '#ffb74d' : '#2196f3'};
             color: white;
             padding: 15px 25px;
             border-radius: 4px;

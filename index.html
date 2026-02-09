@@ -557,6 +557,14 @@
             <span class="action-desc">Switch Weapons</span>
           </div>
           <div class="control-item">
+            <span class="key-combo">SHIFT</span>
+            <span class="action-desc">Hold to Block</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">CTRL</span>
+            <span class="action-desc">Defensive Stance</span>
+          </div>
+          <div class="control-item">
             <span class="key-combo">E</span>
             <span class="action-desc">Interact (NPCs, Buildings)</span>
           </div>
@@ -629,6 +637,14 @@
           <div class="control-item">
             <span class="key-combo">F</span>
             <span class="action-desc">Gather Resources</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">SHIFT</span>
+            <span class="action-desc">Hold to Block</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">CTRL</span>
+            <span class="action-desc">Defensive Stance</span>
           </div>
         </div>
         
@@ -703,6 +719,8 @@
     // Add H key listener for help
     document.addEventListener('keydown', function(e) {
       if (e.code === 'KeyH') {
+        // Let the game handle help toggling once initialized
+        if (window.game) return;
         const helpOverlay = document.getElementById('help-overlay');
         if (helpOverlay.style.display === 'none' || !helpOverlay.style.display) {
           helpOverlay.style.display = 'flex';

@@ -52,6 +52,11 @@ export class Game {
         this.gameMode = 'exploration'; // 'exploration' or 'arena' (for optional combat areas)
         this.currentBiomeName = 'GREEN_HILLS'; // Default start biome
         this.explorationMode = true; // New flag to disable wave-based progression
+
+        // Encounter pacing
+        this.encounterCooldown = 4; // Seconds between encounter rolls
+        this.encounterTimer = 2;
+        this.encounterChance = 0.35; // Chance per roll to spawn
         
         // Replace wave system with exploration regions
         this.currentRegion = 'GREEN_HILLS';
@@ -79,6 +84,10 @@ export class Game {
 
         // Base monster count for exploration encounters
         this.baseMonsterCount = 2; // Reduced for exploration mode
+
+        // Resource gathering pacing
+        this.resourceGatherCooldown = 0.6;
+        this.resourceGatherTimer = 0;
         
         // Game systems
         const { scene, camera } = setupScene();
@@ -92,7 +101,7 @@ export class Game {
         
         // Initialize RPG systems
         this.npcManager = new NPCManager(this.scene, this.particleSystem);
-        this.dialogueSystem = new DialogueSystem();
+        this.dialogueSystem = new DialogueSystem(this.uiManager);
         this.inventorySystem = new InventorySystem();
         this.questManager = new QuestManager();
         this.craftingSystem = new CraftingSystem();
@@ -112,6 +121,7 @@ export class Game {
 
         // Connect global game reference for shop system
         window.game = this;
+        this.syncInventoryWithPlayer();
         
         // World setup
         this.world = new World(this.currentBiomeName);
@@ -268,7 +278,7 @@ export class Game {
                 const helpOverlay = document.getElementById('help-overlay');
                 if (helpOverlay) {
                     const isVisible = helpOverlay.style.display !== 'none';
-                    helpOverlay.style.display = isVisible ? 'none' : 'block';
+                    helpOverlay.style.display = isVisible ? 'none' : 'flex';
                     console.log(`Help overlay ${isVisible ? 'hidden' : 'shown'}`);
                 } else {
                     console.warn('❌ Help overlay not found');
@@ -380,15 +390,12 @@ export class Game {
         }
     }
     spawnRandomEncounter() {
-        // Only spawn encounters occasionally during exploration
-        if (Math.random() < 0.08) { // 8% chance per frame for more encounters
-            const monsterTypes = this.getBiomeMonsters(this.currentBiomeName);
-            // Difficulty-based monster count: harder biomes get more monsters
-            const biomeBase = this.getBiomeDifficulty(this.currentBiomeName);
-            const monsterCount = Math.max(1, biomeBase + Math.floor(Math.random() * (biomeBase + 1)));
-            console.log(`🎯 Random encounter in ${this.currentBiomeName}:`, monsterTypes);
-            this.spawnMonsters(monsterCount, monsterTypes);
-        }
+        const monsterTypes = this.getBiomeMonsters(this.currentBiomeName);
+        // Difficulty-based monster count: harder biomes get more monsters
+        const biomeBase = this.getBiomeDifficulty(this.currentBiomeName);
+        const monsterCount = Math.max(1, biomeBase + Math.floor(Math.random() * (biomeBase + 1)));
+        console.log(`🎯 Random encounter in ${this.currentBiomeName}:`, monsterTypes);
+        this.spawnMonsters(monsterCount, monsterTypes);
     }
     
     getBiomeMonsters(biomeName) {
@@ -507,11 +514,12 @@ export class Game {
         this.projectiles = [];
         this.monsterProjectiles = [];
         console.log("✅ Cleared all monsters and projectiles");
+        this.encounterTimer = this.encounterCooldown;
         
         this.isStarted = true;
         
         // Update UI with current biome
-        this.uiManager.updateBiome(this.currentBiomeName.replace(/_/g, ' '));
+        this.uiManager.updateBiome(this.formatBiomeName(this.currentBiomeName));
         
         // Audio will start automatically after user interaction
         console.log("🎵 Game started - audio will begin automatically on user interaction");
@@ -522,6 +530,10 @@ export class Game {
         // Cooldown timer for teleporting
         if (this.teleportTimer > 0) {
             this.teleportTimer -= deltaTime;
+        }
+
+        if (this.resourceGatherTimer > 0) {
+            this.resourceGatherTimer -= deltaTime;
         }
         
         // Update animation time for sprite effects
@@ -704,7 +716,7 @@ export class Game {
        this.uiManager.updateWeapon(this.player.currentWeapon, this.player.combatStance);
         const monsterPositions = this.monsters.map(m => m.mesh.position);
         // Get NPC positions for minimap
-        const npcPositions = this.npcManager.getActiveNPCs().map(npc => npc.position);
+        const npcPositions = this.npcManager.getActiveNPCs().map(npc => npc.mesh?.position || npc.position);
         this.uiManager.updateMinimap(this.player.mesh.position, this.world.worldSize, this.world.castlePosition, monsterPositions, npcPositions);
        // Make camera follow player smoothly
         const targetPosition = this.player.mesh.position.clone();
@@ -761,7 +773,16 @@ export class Game {
     updateMonsters(deltaTime, aliveMonsters) {
         // In exploration mode, occasionally spawn random encounters
         if (this.monsters.length === 0 && !this.isGameOver && this.explorationMode) {
-            this.spawnRandomEncounter();
+            this.encounterTimer -= deltaTime;
+            if (this.encounterTimer <= 0) {
+                if (Math.random() < this.encounterChance) {
+                    this.spawnRandomEncounter();
+                }
+                this.encounterTimer = this.encounterCooldown + Math.random() * this.encounterCooldown;
+            }
+        } else if (this.monsters.length > 0) {
+            // Reset timer once combat is active
+            this.encounterTimer = Math.max(this.encounterTimer, this.encounterCooldown);
         }
         // Check if player touches monster and apply damage if not invulnerable
         for (const monster of this.monsters) {
@@ -1203,6 +1224,7 @@ export class Game {
             monster.dispose();
         });
         this.monsters = [];
+        this.encounterTimer = this.encounterCooldown;
         
         // Clear projectiles to prevent visual artifacts
         this.projectiles.forEach(proj => {
@@ -1222,7 +1244,7 @@ export class Game {
         }
         
         // Update UI
-        this.uiManager.updateBiome(region);
+        this.uiManager.updateBiome(this.formatBiomeName(region));
         console.log("Successfully traveled to:", region);
     }
     
@@ -1454,9 +1476,6 @@ export class Game {
                                 // Check if entire quest is complete
                                 if (quest.objectives.every(obj => obj.completed)) {
                                     this.questManager.completeQuest(quest.id);
-                                            this.score += quest.rewards.gold || 0;
-        this.uiManager.playerGold = this.score; // Sync playerGold with score
-        this.uiManager.updateGold(this.score);
                                     console.log(`🎉 Quest completed: ${quest.title}`);
                                 }
                             }
@@ -1536,21 +1555,36 @@ export class Game {
     checkResourceGathering() {
         if (!this.inputHandler.keys['KeyF']) return;
         this.inputHandler.keys['KeyF'] = false; // Consume the input
+
+        if (this.resourceGatherTimer > 0) {
+            if (this.uiManager) {
+                this.uiManager.showNotification('You need to catch your breath...', 'warning');
+            }
+            return;
+        }
         
         // Check for nearby resources in the current biome
         const playerPos = this.player.mesh.position;
-        const currentBiome = this.currentRegion || 'Green Hills';
+        const currentBiome = this.formatBiomeName(this.currentRegion || this.currentBiomeName || 'Green Hills');
         
         // Get available resources for this biome
         const biomeResources = this.craftingSystem.getBiomeResources(currentBiome);
-        if (biomeResources.length === 0) return;
+        if (biomeResources.length === 0) {
+            this.uiManager.showNotification('No gatherable resources here.', 'info');
+            return;
+        }
         
         // Randomly select a resource based on rarity
         const availableResource = this.selectRandomResource(biomeResources);
-        if (!availableResource) return;
+        if (!availableResource) {
+            this.uiManager.showNotification('Nothing found this time.', 'info');
+            return;
+        }
         
         // Add resource to inventory
-        const amount = Math.floor(Math.random() * 3) + 1; // 1-3 items
+        const baseAmount = Math.floor(Math.random() * 3) + 1; // 1-3 items
+        const bonus = this.resourceGatheringBonus || 1;
+        const amount = Math.max(1, Math.round(baseAmount * bonus));
         this.inventorySystem.addItem({
             name: availableResource.type,
             quantity: amount,
@@ -1560,10 +1594,13 @@ export class Game {
         
         // Visual feedback
         this.particleSystem.createEffect('pickup', playerPos);
+        this.audioManager.playSound('pickup');
         console.log(`Gathered ${amount} ${availableResource.type} from ${currentBiome}`);
         
         // Update UI
         this.uiManager.showNotification(`+${amount} ${availableResource.type}`, 'resource');
+
+        this.resourceGatherTimer = this.resourceGatherCooldown;
     }
     
     selectRandomResource(resources) {
@@ -1580,6 +1617,18 @@ export class Game {
         
         const randomIndex = Math.floor(Math.random() * weightedResources.length);
         return weightedResources[randomIndex];
+    }
+
+    formatBiomeName(biomeId) {
+        if (!biomeId) return 'Green Hills';
+        if (biomeId.includes('_')) {
+            return biomeId
+                .toLowerCase()
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+        return biomeId;
     }
 
 

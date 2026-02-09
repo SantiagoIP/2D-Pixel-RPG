@@ -143,6 +143,8 @@ export class Player {
         this.criticalMultiplier = 2.0;
         this.blockChance = 0.05; // 5% base block chance
         this.dodgeChance = 0.05; // 5% base dodge chance
+        this.baseBlockChance = this.blockChance;
+        this.baseDodgeChance = this.dodgeChance;
         this.isBlocking = false;
         this.isDodging = false;
         this.combatStance = 'normal'; // normal, aggressive, defensive
@@ -496,6 +498,8 @@ export class Player {
         this.speed = this.baseSpeed + (this.equipmentSpeedBonus || 0);
         this.attackDamage = this.baseAttackDamage;
         this.attackCooldown = this.baseAttackCooldown * this.weaponCooldownMultiplier;
+        this.blockChance = this.baseBlockChance;
+        this.dodgeChance = this.baseDodgeChance;
 
         for (const buffId in this.activeBuffs) {
             const buff = this.activeBuffs[buffId];
@@ -511,10 +515,28 @@ export class Player {
                 if (buff.effects.attackSpeed) this.attackCooldown *= (1 / buff.effects.attackSpeed);
             }
         }
+
+        // Apply combat stance modifiers
+        if (this.combatStance === 'defensive') {
+            this.speed *= 0.85;
+            this.attackCooldown *= 1.15;
+            this.blockChance += 0.15;
+        }
+
+        if (this.isBlocking) {
+            this.speed *= 0.7;
+            this.blockChance += 0.2;
+        }
+
+        this.blockChance = Math.min(this.blockChance, 0.6);
     }
 
     update(deltaTime, obstacles, worldSize, worldCenter = new THREE.Vector3(0,0,0), world, questManager, inventorySystem) {
         if (!this.isAlive()) return;
+
+        const keys = this.inputHandler?.keys || {};
+        this.isBlocking = !!(keys['ShiftLeft'] || keys['ShiftRight']);
+        this.combatStance = (keys['ControlLeft'] || keys['ControlRight']) ? 'defensive' : 'normal';
 
         // Calculate movement and apply to position
         const velocity = this.handleMovement(deltaTime);
@@ -568,6 +590,9 @@ export class Player {
                         inventorySystem.addItem({ name: 'Healing Herb', quantity: 1, type: 'herb' });
                     }
                     this.particleSystem.createEffect('pickup', collectible.position);
+                    if (window.game?.audioManager) {
+                        window.game.audioManager.playSound('pickup');
+                    }
                     collectiblesToRemove.push(i);
                     world.overworldContainer.remove(collectible);
                 }

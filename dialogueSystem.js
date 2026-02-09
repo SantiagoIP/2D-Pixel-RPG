@@ -274,7 +274,12 @@ export class DialogueSystem {
     openShop() {
         // Close dialogue and open shop interface
         this.endDialogue();
-        this.uiManager.showShop(this.currentDialogue.shop, this.currentNPC.name);
+        const uiManager = this.uiManager || window.game?.uiManager;
+        if (uiManager && typeof uiManager.showShop === 'function') {
+            uiManager.showShop(this.currentDialogue.shop, this.currentNPC.name);
+        } else {
+            console.warn('Shop UI unavailable');
+        }
     }
     
     showQuests() {
@@ -283,7 +288,7 @@ export class DialogueSystem {
             this.displayDialogue("I don't have any tasks for you right now, but check back later!");
         } else {
             const questText = quests.map(quest => 
-                `${quest.name}: ${quest.description}`
+                `${quest.title || quest.name}: ${quest.description}`
             ).join('\n\n');
             this.displayDialogue(`Here's what I need help with:\n\n${questText}`);
         }

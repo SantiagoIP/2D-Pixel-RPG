@@ -122,7 +122,7 @@ export class CharacterProgressionSystem {
         // Heal player on level up (classic RPG mechanic)
         if (window.game && window.game.player) {
             window.game.player.currentHealth = window.game.player.maxHealth;
-            window.game.player.currentMana = window.game.player.maxMana;
+            window.game.player.mana = window.game.player.maxMana;
         }
     }
     

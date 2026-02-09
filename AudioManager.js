@@ -9,6 +9,10 @@ export class AudioManager {
         this.isInitialized = false;
         this.musicEnabled = false;
         this.userHasInteracted = false;
+        this.musicVolume = 0.6;
+        this.sfxVolume = 0.7;
+
+        this.loadSettings();
         
         // Bind and setup user interaction detection
         this.handleUserInteraction = this.handleUserInteraction.bind(this);
@@ -23,6 +27,51 @@ export class AudioManager {
         events.forEach(event => {
             document.addEventListener(event, this.handleUserInteraction, { once: false });
         });
+    }
+
+    loadSettings() {
+        try {
+            const saved = localStorage.getItem('pixelScrolls_audio');
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            if (typeof data.musicVolume === 'number') {
+                this.musicVolume = Math.max(0, Math.min(1, data.musicVolume));
+            }
+            if (typeof data.sfxVolume === 'number') {
+                this.sfxVolume = Math.max(0, Math.min(1, data.sfxVolume));
+            }
+        } catch (error) {
+            console.warn('Failed to load audio settings:', error);
+        }
+    }
+
+    saveSettings() {
+        try {
+            localStorage.setItem('pixelScrolls_audio', JSON.stringify({
+                musicVolume: this.musicVolume,
+                sfxVolume: this.sfxVolume
+            }));
+        } catch (error) {
+            console.warn('Failed to save audio settings:', error);
+        }
+    }
+
+    setMusicVolume(value) {
+        this.musicVolume = Math.max(0, Math.min(1, value));
+        this.saveSettings();
+    }
+
+    setSfxVolume(value) {
+        this.sfxVolume = Math.max(0, Math.min(1, value));
+        this.saveSettings();
+    }
+
+    getMusicVolume() {
+        return this.musicVolume;
+    }
+
+    getSfxVolume() {
+        return this.sfxVolume;
     }
     
     async handleUserInteraction() {
@@ -89,6 +138,8 @@ export class AudioManager {
         this.sounds['monsterHit'] = this.createNoiseSound(0.15, 0.2);
         this.sounds['playerHit'] = this.createNoiseSound(0.25, 0.4);
         this.sounds['levelUp'] = this.createSynthSound(523.25, 0.5, 'triangle', 0.6);
+        this.sounds['pickup'] = this.createSynthSound(880, 0.06, 'triangle', 0.35);
+        this.sounds['uiClick'] = this.createSynthSound(660, 0.03, 'square', 0.25);
         
         // Create music tracks
         this.createMusicTrack('overworld', 120, [
@@ -189,10 +240,11 @@ export class AudioManager {
              if (!this.audioContext || this.audioContext.state !== 'running') return;
             const oscillator = this.audioContext.createOscillator();
             const gainNode = this.audioContext.createGain();
+            const volumeLevel = volume * this.sfxVolume;
 
             oscillator.type = type;
             oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-            gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+            gainNode.gain.setValueAtTime(volumeLevel, this.audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
 
             oscillator.connect(gainNode);
@@ -209,6 +261,7 @@ export class AudioManager {
             const bufferSize = this.audioContext.sampleRate * duration;
             const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
             const output = buffer.getChannelData(0);
+            const volumeLevel = volume * this.sfxVolume;
 
             for (let i = 0; i < bufferSize; i++) {
                 output[i] = Math.random() * 2 - 1; // White noise
@@ -217,7 +270,7 @@ export class AudioManager {
             const noiseSource = this.audioContext.createBufferSource();
             noiseSource.buffer = buffer;
             const gainNode = this.audioContext.createGain();
-            gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+            gainNode.gain.setValueAtTime(volumeLevel, this.audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
 
 
@@ -311,7 +364,7 @@ export class AudioManager {
                         
                         oscillator.type = 'triangle';
                         oscillator.frequency.setValueAtTime(freq, scheduleTime);
-                        gainNode.gain.setValueAtTime(0.08, scheduleTime); // Lower volume
+                        gainNode.gain.setValueAtTime(0.08 * this.musicVolume, scheduleTime); // Lower volume
                         gainNode.gain.exponentialRampToValueAtTime(0.001, scheduleTime + duration * 0.9);
                         
                         oscillator.connect(gainNode);

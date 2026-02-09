@@ -629,13 +629,11 @@ export class World {
             const house = createPixelSprite(spriteType, houseSize);
             house.position.copy(pos);
             house.position.y = houseSize / 2 + 0.01; // raise slightly above ground to prevent z-fighting
+            house.userData.size = houseSize;
             safeAdd(this.overworldContainer, house);
             
             // Add to obstacles for collision
-            this.obstacles.push({
-                position: pos,
-                size: 1.5
-            });
+            this.obstacles.push(house);
         });
         
         // Village well in center
@@ -643,12 +641,10 @@ export class World {
         const well = createPixelSprite('villageWell', wellSize);
         well.position.copy(villageCenter);
         well.position.y = wellSize / 2 + 0.01;
+        well.userData.size = wellSize;
         safeAdd(this.overworldContainer, well);
         
-        this.obstacles.push({
-            position: villageCenter,
-            size: 1.0
-        });
+        this.obstacles.push(well);
         
         console.log("🏘️ Created village with", housePositions.length, "buildings and a well");
     }

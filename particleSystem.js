@@ -230,18 +230,73 @@ export class ParticleSystem {
                 gravity: 2,
                 drag: 0.96,
                 elevationRange: [-Math.PI/6, Math.PI/2]
+            },
+            attackHit: {
+                count: 30,
+                colors: ['#FFF1A8', '#FFCC00', '#FF7043', '#FFFFFF'],
+                sizeRange: [4, 9],
+                speedRange: [4, 8],
+                lifeRange: [0.4, 0.9],
+                gravity: 1.6,
+                drag: 0.94,
+                elevationRange: [-Math.PI/6, Math.PI/3]
+            },
+            monsterDefeat: {
+                count: 70,
+                colors: ['#FF6B6B', '#FF4D4D', '#FFD166', '#FFFFFF'],
+                sizeRange: [5, 12],
+                speedRange: [4, 9],
+                lifeRange: [1.0, 2.2],
+                gravity: 2.2,
+                drag: 0.93,
+                elevationRange: [0, Math.PI]
+            },
+            shrineActivate: {
+                count: 120,
+                colors: ['#9D4EDD', '#C77DFF', '#FFD6FF', '#FFFFFF'],
+                sizeRange: [6, 14],
+                speedRange: [2, 6],
+                lifeRange: [1.5, 3.2],
+                gravity: -0.6,
+                drag: 0.97,
+                elevationRange: [0, Math.PI]
+            },
+            npcInteract: {
+                count: 45,
+                colors: ['#00B4D8', '#90E0EF', '#CAF0F8', '#FFFFFF'],
+                sizeRange: [4, 10],
+                speedRange: [2, 5],
+                lifeRange: [0.8, 1.6],
+                gravity: 0.3,
+                drag: 0.96,
+                elevationRange: [0, Math.PI/2]
+            },
+            pickup: {
+                count: 32,
+                colors: ['#FFD700', '#FFE66D', '#FFFFFF'],
+                sizeRange: [3, 8],
+                speedRange: [2, 5],
+                lifeRange: [0.6, 1.2],
+                gravity: 1.2,
+                drag: 0.94,
+                elevationRange: [-Math.PI/6, Math.PI/3]
             }
         };
     }
 
     createEffect(type, origin) {
-        if (!this.effectConfigs[type]) {
+        this.emit(type, origin);
+    }
+
+    emit(type, origin, overrideConfig = null) {
+        const baseConfig = this.effectConfigs[type] || {};
+        const config = overrideConfig ? { ...baseConfig, ...overrideConfig } : baseConfig;
+
+        if (!config.count) {
             console.warn(`Particle effect type "${type}" not found.`);
             return;
         }
-        
-        const config = this.effectConfigs[type];
-        
+
         for (let i = 0; i < config.count; i++) {
             if (this.activeParticles.length >= this.maxParticles) break;
 

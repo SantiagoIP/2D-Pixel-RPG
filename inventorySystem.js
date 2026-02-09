@@ -10,6 +10,8 @@ export class InventorySystem {
         this.maxSlots = 20; // Grid size: 4x5
         this.isVisible = false;
         this.selectedItem = null;
+        this.overlay = null;
+        this.inventoryGrid = null;
         this.playerStats = {
             level: 1,
             health: 5,
@@ -70,6 +72,7 @@ export class InventorySystem {
             z-index: 1500;
             font-family: 'Press Start 2P', cursive;
         `;
+        this.overlay = overlay;
         
         // Main inventory panel
         const panel = document.createElement('div');
@@ -187,6 +190,7 @@ export class InventorySystem {
             border: 2px solid #555;
             border-radius: 4px;
         `;
+        this.inventoryGrid = inventoryGrid;
         
         // Create inventory slots
         for (let i = 0; i < this.maxSlots; i++) {
@@ -264,68 +268,152 @@ export class InventorySystem {
         overlay.appendChild(controls);
     }
     
-    addItem(itemData) {
-        const existingItem = Array.from(this.items.values())
-            .find(item => item.name === itemData.name && item.type === itemData.type);
-        
-        if (existingItem && itemData.type === 'consumable') {
-            // Stack consumables
-            existingItem.quantity = (existingItem.quantity || 1) + (itemData.quantity || 1);
-        } else {
-            // Add new item
-            const item = {
-                ...itemData,
-                id: itemData.id || this.generateItemId(),
-                quantity: itemData.quantity || 1
-            };
-            this.items.set(item.id, item);
-            
-            // Auto-equip if it's the first item of its type
-            if (itemData.equipped || (!this.equipment[item.type] && 
-                ['weapon', 'armor', 'accessory'].includes(item.type))) {
-                this.equipItem(item.id);
+    addItem(itemOrId, quantity = 1, itemData = null) {
+        let item = null;
+        let shouldEquip = false;
+
+        if (itemOrId && typeof itemOrId === 'object') {
+            const data = { ...itemOrId };
+            const itemType = data.type || 'consumable';
+            const itemQuantity = data.quantity || 1;
+            const itemName = data.name || this.formatItemName(data.id || 'item');
+
+            if (this.isStackable(itemType)) {
+                const existingItem = this.findStackableItem(itemName, itemType);
+                if (existingItem) {
+                    existingItem.quantity += itemQuantity;
+                    this.updateInventoryDisplay();
+                    return true;
+                }
             }
+
+            item = {
+                id: data.id || this.generateItemId(),
+                name: itemName,
+                type: itemType,
+                description: data.description || '',
+                value: data.value || 0,
+                stats: data.stats || {},
+                quantity: itemQuantity,
+                equipped: !!data.equipped,
+                rarity: data.rarity || 'common',
+                healing: data.healing,
+                manaRestore: data.manaRestore,
+                buffType: data.buffType,
+                buffEffects: data.buffEffects,
+                buffDuration: data.buffDuration,
+                icon: data.icon
+            };
+            shouldEquip = item.equipped;
+        } else {
+            const itemId = String(itemOrId);
+            const data = itemData || {};
+            const itemType = data.type || 'consumable';
+            const itemName = data.name || this.formatItemName(itemId);
+
+            if (this.isStackable(itemType)) {
+                const existingItem = this.findStackableItem(itemName, itemType);
+                if (existingItem) {
+                    existingItem.quantity += quantity;
+                    this.updateInventoryDisplay();
+                    return true;
+                }
+            }
+
+            item = {
+                id: itemId,
+                name: itemName,
+                type: itemType,
+                description: data.description || '',
+                value: data.value || 0,
+                stats: data.stats || {},
+                quantity: quantity,
+                equipped: !!data.equipped,
+                rarity: data.rarity || 'common',
+                healing: data.healing,
+                manaRestore: data.manaRestore,
+                buffType: data.buffType,
+                buffEffects: data.buffEffects,
+                buffDuration: data.buffDuration,
+                icon: data.icon
+            };
+            shouldEquip = item.equipped;
         }
-        
-        this.updateInventoryDisplay();
+
+        if (!item) return false;
+
+        this.items.set(item.id, item);
+
+        // Auto-equip if requested or slot empty for equippable items
+        const slot = this.getEquipmentSlot(item.type);
+        if (shouldEquip || (slot && !this.equipment[slot])) {
+            this.equipItem(item.id);
+        } else {
+            this.updateInventoryDisplay();
+        }
+
         return true;
     }
     
-    removeItem(itemId, quantity = 1) {
-        const item = this.items.get(itemId);
+    removeItem(itemIdOrName, quantity = 1) {
+        let item = this.items.get(itemIdOrName);
+
+        if (!item) {
+            // Attempt to find by name (stackable items)
+            item = this.findStackableItem(String(itemIdOrName));
+        }
+
         if (!item) return false;
-        
+
         if (item.quantity > quantity) {
             item.quantity -= quantity;
         } else {
-            this.items.delete(itemId);
-            // Unequip if currently equipped
-            Object.keys(this.equipment).forEach(slot => {
-                if (this.equipment[slot]?.id === itemId) {
+            this.items.delete(item.id);
+            if (item.equipped) {
+                const slot = this.getEquipmentSlot(item.type);
+                if (slot) {
                     this.equipment[slot] = null;
                 }
-            });
+            }
         }
-        
+
+        this.applyEquipmentBonuses();
         this.updateInventoryDisplay();
         return true;
     }
     
     equipItem(itemId) {
         const item = this.items.get(itemId);
-        if (!item || !['weapon', 'armor', 'accessory'].includes(item.type)) {
-            return false;
+        if (!item) return false;
+
+        const slot = this.getEquipmentSlot(item.type);
+        if (!slot) return false;
+
+        if (this.equipment[slot] && this.equipment[slot].id !== itemId) {
+            this.equipment[slot].equipped = false;
         }
-        
-        // Unequip current item in that slot
-        if (this.equipment[item.type]) {
-            this.equipment[item.type].equipped = false;
-        }
-        
-        // Equip new item
-        this.equipment[item.type] = item;
+
+        this.equipment[slot] = item;
         item.equipped = true;
-        
+
+        this.applyEquipmentBonuses();
+        this.updateInventoryDisplay();
+        return true;
+    }
+
+    unequipItem(slotOrItemId) {
+        let slot = slotOrItemId;
+        if (!['weapon', 'armor', 'accessory'].includes(slotOrItemId)) {
+            const item = this.items.get(slotOrItemId);
+            slot = item ? this.getEquipmentSlot(item.type) : null;
+        }
+
+        if (!slot || !this.equipment[slot]) return false;
+
+        this.equipment[slot].equipped = false;
+        this.equipment[slot] = null;
+
+        this.applyEquipmentBonuses();
         this.updateInventoryDisplay();
         return true;
     }
@@ -463,6 +551,15 @@ export class InventorySystem {
         const item = items[slotIndex];
         
         if (item) {
+            const slot = this.getEquipmentSlot(item.type);
+            if (item.equipped && slot) {
+                this.unequipItem(slot);
+                if (window.game?.uiManager) {
+                    window.game.uiManager.showNotification(`Unequipped ${item.name}`, 'info');
+                }
+                return { type: 'unequip', item: item.name };
+            }
+
             const result = this.useItem(item.id);
             if (result) {
                 // Return result for game to handle (e.g., healing)
@@ -477,9 +574,14 @@ export class InventorySystem {
     
     updateInventoryDisplay() {
         if (!this.isVisible) return;
+
+        this.syncGoldFromGame();
         
         // Update gold display
-        document.getElementById('gold-display').textContent = `Gold: ${this.gold}`;
+        const goldDisplay = document.getElementById('gold-display');
+        if (goldDisplay) {
+            goldDisplay.textContent = `Gold: ${this.gold}`;
+        }
         
         // Update equipment slots
         Object.keys(this.equipment).forEach(slot => {
@@ -573,12 +675,24 @@ export class InventorySystem {
     
     addGold(amount) {
         this.gold += amount;
+        if (window.game) {
+            window.game.score = this.gold;
+            if (window.game.uiManager) {
+                window.game.uiManager.updateGold(this.gold);
+            }
+        }
         this.updateInventoryDisplay();
     }
     
     spendGold(amount) {
         if (this.gold >= amount) {
             this.gold -= amount;
+            if (window.game) {
+                window.game.score = this.gold;
+                if (window.game.uiManager) {
+                    window.game.uiManager.updateGold(this.gold);
+                }
+            }
             this.updateInventoryDisplay();
             return true;
         }
@@ -590,12 +704,12 @@ export class InventorySystem {
     }
     
     getItemCount(itemName) {
-        const item = Array.from(this.items.values()).find(item => item.name === itemName);
-        return item ? item.quantity : 0;
+        return this.getItemQuantity(itemName);
     }
     
     updateCharacterDisplay(stats) {
         // Update character stats display in inventory
+        this.syncGoldFromGame();
         const levelDisplay = document.getElementById('char-level');
         const healthDisplay = document.getElementById('char-health');
         const attackDisplay = document.getElementById('char-attack');
@@ -619,103 +733,99 @@ export class InventorySystem {
             overlay.remove();
         }
     }
-    
-    // Enhanced add item with equipment support
-    addItem(itemId, quantity = 1, itemData = null) {
-        if (this.items.has(itemId)) {
-            const existingItem = this.items.get(itemId);
-            existingItem.quantity += quantity;
-        } else {
-            this.items.set(itemId, { 
-                quantity, 
-                type: itemData?.type || 'consumable',
-                stats: itemData?.stats || {},
-                description: itemData?.description || '',
-                rarity: itemData?.rarity || 'common'
+
+    syncGoldFromGame() {
+        if (window.game && typeof window.game.score === 'number') {
+            this.gold = window.game.score;
+        }
+    }
+
+    getItemQuantity(itemIdOrName) {
+        if (!itemIdOrName) return 0;
+
+        const direct = this.items.get(itemIdOrName);
+        if (direct) return direct.quantity || 0;
+
+        let total = 0;
+        const name = String(itemIdOrName);
+        this.items.forEach(item => {
+            if (item.name === name) {
+                total += item.quantity || 0;
+            }
+        });
+        return total;
+    }
+
+    getAllItems() {
+        return Array.from(this.items.values()).map(item => ({ ...item }));
+    }
+
+    loadItems(items) {
+        this.items.clear();
+        this.equipment = { weapon: null, armor: null, accessory: null };
+
+        if (Array.isArray(items)) {
+            items.forEach(data => {
+                if (!data) return;
+                const item = {
+                    id: data.id || this.generateItemId(),
+                    name: data.name || this.formatItemName(data.id || 'item'),
+                    type: data.type || 'consumable',
+                    description: data.description || '',
+                    value: data.value || 0,
+                    stats: data.stats || {},
+                    quantity: data.quantity || 1,
+                    equipped: !!data.equipped,
+                    rarity: data.rarity || 'common',
+                    healing: data.healing,
+                    manaRestore: data.manaRestore,
+                    buffType: data.buffType,
+                    buffEffects: data.buffEffects,
+                    buffDuration: data.buffDuration,
+                    icon: data.icon
+                };
+                this.items.set(item.id, item);
             });
         }
-        console.log(`Added ${quantity} ${itemId}(s) to inventory`);
-        this.refreshInventoryDisplay();
-    }
-    
-    // New equipment methods
-    equipItem(itemId) {
-        const item = this.items.get(itemId);
-        if (!item) return false;
-        
-        const equipSlot = this.getEquipmentSlot(item.type);
-        if (!equipSlot) return false;
-        
-        // Unequip current item in slot if any
-        if (this.equipment[equipSlot]) {
-            this.unequipItem(equipSlot);
-        }
-        
-        // Equip new item
-        this.equipment[equipSlot] = {
-            id: itemId,
-            ...item
-        };
-        
-        // Remove from inventory
-        this.removeItem(itemId, 1);
-        
-        // Apply stat bonuses
-        this.applyEquipmentBonuses();
-        
-        console.log(`Equipped ${itemId} in ${equipSlot} slot`);
-        this.refreshInventoryDisplay();
-        return true;
-    }
-    
-    unequipItem(slot) {
-        const equipped = this.equipment[slot];
-        if (!equipped) return false;
-        
-        // Add back to inventory
-        this.addItem(equipped.id, 1, {
-            type: equipped.type,
-            stats: equipped.stats,
-            description: equipped.description,
-            rarity: equipped.rarity
+
+        // Restore equipment references
+        this.items.forEach(item => {
+            if (item.equipped) {
+                const slot = this.getEquipmentSlot(item.type);
+                if (slot) {
+                    this.equipment[slot] = item;
+                }
+            }
         });
-        
-        // Remove from equipment
-        this.equipment[slot] = null;
-        
-        // Recalculate bonuses
+
         this.applyEquipmentBonuses();
-        
-        console.log(`Unequipped ${equipped.id} from ${slot} slot`);
-        this.refreshInventoryDisplay();
-        return true;
+        this.updateInventoryDisplay();
     }
-    
+
     getEquipmentSlot(itemType) {
         const slotMap = {
-            'weapon': 'weapon',
-            'sword': 'weapon',
-            'bow': 'weapon', 
-            'staff': 'weapon',
-            'armor': 'armor',
-            'helmet': 'armor',
-            'chestplate': 'armor',
-            'ring': 'accessory',
-            'amulet': 'accessory'
+            weapon: 'weapon',
+            sword: 'weapon',
+            bow: 'weapon',
+            staff: 'weapon',
+            armor: 'armor',
+            helmet: 'armor',
+            chestplate: 'armor',
+            ring: 'accessory',
+            amulet: 'accessory',
+            accessory: 'accessory'
         };
         return slotMap[itemType] || null;
     }
-    
+
     applyEquipmentBonuses() {
-        // Reset bonuses
         this.equipmentBonuses = {
             attack: 0,
             defense: 0,
             speed: 0,
             health: 0
         };
-        
-        // Calculate total bonuses from all equipped items
+
         Object.values(this.equipment).forEach(item => {
             if (item && item.stats) {
                 Object.keys(this.equipmentBonuses).forEach(stat => {
@@ -725,113 +835,40 @@ export class InventorySystem {
                 });
             }
         });
-        
-        console.log('Equipment bonuses updated:', this.equipmentBonuses);
+
+        if (window.game?.syncInventoryWithPlayer) {
+            window.game.syncInventoryWithPlayer();
+        }
     }
-    
+
     getTotalStats() {
         return {
-            attack: this.playerStats.attack + this.equipmentBonuses.attack,
-            defense: this.playerStats.defense + this.equipmentBonuses.defense,
-            speed: this.playerStats.speed + this.equipmentBonuses.speed,
-            maxHealth: this.playerStats.maxHealth + this.equipmentBonuses.health
+            attack: this.equipmentBonuses.attack,
+            defense: this.equipmentBonuses.defense,
+            speed: this.equipmentBonuses.speed,
+            maxHealth: this.equipmentBonuses.health
         };
     }
-    
-    setupEquipmentUI() {
-        // Equipment panel will be added to existing inventory UI
-        // This will be integrated with the main inventory display
+
+    isStackable(itemType) {
+        return ['consumable', 'material', 'herb', 'currency', 'resource'].includes(itemType);
     }
-    
-    // Enhanced inventory display with equipment
+
+    findStackableItem(itemName, itemType = null) {
+        return Array.from(this.items.values()).find(item => {
+            if (item.name !== itemName) return false;
+            if (!itemType) return true;
+            return item.type === itemType;
+        });
+    }
+
+    formatItemName(itemId) {
+        return String(itemId)
+            .replace(/[_-]+/g, ' ')
+            .replace(/\b\w/g, char => char.toUpperCase());
+    }
+
     refreshInventoryDisplay() {
-        if (!this.isVisible || !this.overlay) return;
-        
-        const inventoryGrid = this.overlay.querySelector('.inventory-grid');
-        const equipmentPanel = this.overlay.querySelector('.equipment-panel');
-        
-        if (inventoryGrid) {
-            inventoryGrid.innerHTML = '';
-            
-            // Display regular inventory items
-            this.items.forEach((item, itemId) => {
-                const itemElement = this.createItemElement(itemId, item);
-                inventoryGrid.appendChild(itemElement);
-            });
-        }
-        
-        // Update equipment panel
-        if (equipmentPanel) {
-            this.updateEquipmentPanel(equipmentPanel);
-        }
-        
-        // Update stats display
-        this.updateStatsDisplay();
+        this.updateInventoryDisplay();
     }
-    
-    updateEquipmentPanel(panel) {
-        panel.innerHTML = `
-            <h3>Equipment</h3>
-            <div class="equipment-slots">
-                <div class="equipment-slot weapon-slot">
-                    <div class="slot-label">Weapon</div>
-                    <div class="slot-content">
-                        ${this.equipment.weapon ? this.createEquippedItemDisplay(this.equipment.weapon) : '<div class="empty-slot">Empty</div>'}
-                    </div>
-                </div>
-                <div class="equipment-slot armor-slot">
-                    <div class="slot-label">Armor</div>
-                    <div class="slot-content">
-                        ${this.equipment.armor ? this.createEquippedItemDisplay(this.equipment.armor) : '<div class="empty-slot">Empty</div>'}
-                    </div>
-                </div>
-                <div class="equipment-slot accessory-slot">
-                    <div class="slot-label">Accessory</div>
-                    <div class="slot-content">
-                        ${this.equipment.accessory ? this.createEquippedItemDisplay(this.equipment.accessory) : '<div class="empty-slot">Empty</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    createEquippedItemDisplay(item) {
-        const rarityClass = item.rarity || 'common';
-        const statsText = Object.entries(item.stats || {})
-            .map(([stat, value]) => `${stat}: +${value}`)
-            .join(', ');
-        
-        return `
-            <div class="equipped-item ${rarityClass}" data-item="${item.id}">
-                <div class="item-name">${this.formatItemName(item.id)}</div>
-                ${statsText ? `<div class="item-stats">${statsText}</div>` : ''}
-                <button class="unequip-btn" onclick="window.game.inventorySystem.unequipItem('${this.getEquipmentSlot(item.type)}')">Unequip</button>
-            </div>
-        `;
-    }
-    
-    // Enhanced item element creation with equip functionality
-    createItemElement(itemId, item) {
-        const element = document.createElement('div');
-        element.className = `inventory-item ${item.rarity || 'common'}`;
-        element.dataset.itemId = itemId;
-        
-        const isEquippable = this.getEquipmentSlot(item.type) !== null;
-        const statsText = Object.entries(item.stats || {})
-            .map(([stat, value]) => `${stat}: +${value}`)
-            .join(', ');
-        
-        element.innerHTML = `
-            <div class="item-name">${this.formatItemName(itemId)}</div>
-            <div class="item-quantity">x${item.quantity}</div>
-            ${item.description ? `<div class="item-description">${item.description}</div>` : ''}
-            ${statsText ? `<div class="item-stats">${statsText}</div>` : ''}
-            <div class="item-actions">
-                ${isEquippable ? `<button onclick="window.game.inventorySystem.equipItem('${itemId}')">Equip</button>` : ''}
-                ${item.type === 'consumable' ? `<button onclick="window.game.inventorySystem.useItem('${itemId}')">Use</button>` : ''}
-            </div>
-        `;
-        
-        return element;
-    }
-} 
+}

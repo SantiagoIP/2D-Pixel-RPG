@@ -246,10 +246,15 @@ export class QuestManager {
         const objective = quest.objectives.find(obj => obj.id === objectiveId);
         if (!objective) return false;
         
-        if (objective.target) {
-            // Progress-based objective
-            objective.current = Math.min(objective.current + progress, objective.target);
-            if (objective.current >= objective.target) {
+        if (objective.target || objective.required) {
+            const targetValue = typeof objective.target === 'number' ? objective.target : objective.required;
+            if (typeof targetValue === 'number') {
+                objective.current = Math.min((objective.current || 0) + progress, targetValue);
+                if (objective.current >= targetValue) {
+                    objective.completed = true;
+                }
+            } else {
+                // Fallback for non-numeric targets
                 objective.completed = true;
             }
         } else {
@@ -482,6 +487,9 @@ export class QuestManager {
             </div>`;
         }).join('');
         
+        const rewards = quest.rewards || {};
+        const rewardItems = Array.isArray(rewards.items) ? rewards.items : [];
+
         detailsContainer.innerHTML = `
             <h3 style="color: #ffeb3b; margin: 0 0 15px 0; font-size: 0.9em;">${quest.title}</h3>
             <div style="color: #aaa; font-size: 0.6em; margin-bottom: 15px;">
@@ -496,9 +504,9 @@ export class QuestManager {
             
             <h4 style="color: #ff9800; font-size: 0.7em; margin: 20px 0 10px 0;">Rewards:</h4>
             <div style="font-size: 0.6em; color: #aaa;">
-                ${quest.rewards.gold ? `• ${quest.rewards.gold} Gold<br>` : ''}
-                ${quest.rewards.experience ? `• ${quest.rewards.experience} Experience<br>` : ''}
-                ${quest.rewards.items.length > 0 ? quest.rewards.items.map(item => `• ${item.name} (${item.quantity})`).join('<br>') : ''}
+                ${rewards.gold ? `• ${rewards.gold} Gold<br>` : ''}
+                ${rewards.experience ? `• ${rewards.experience} Experience<br>` : ''}
+                ${rewardItems.length > 0 ? rewardItems.map(item => `• ${item.name} (${item.quantity})`).join('<br>') : ''}
             </div>
             
             ${quest.status === 'available' ? `
@@ -557,6 +565,39 @@ export class QuestManager {
     
     hasQuest(questId) {
         return this.isQuestActive(questId) || this.isQuestCompleted(questId) || this.availableQuests.has(questId);
+    }
+
+    getAllQuests() {
+        return {
+            active: Array.from(this.activeQuests.values()),
+            completed: Array.from(this.completedQuests.values()),
+            available: Array.from(this.availableQuests.values())
+        };
+    }
+
+    loadQuests(data) {
+        if (!data) return;
+
+        this.activeQuests = new Map();
+        this.completedQuests = new Map();
+        this.availableQuests = new Map();
+
+        const active = Array.isArray(data.active) ? data.active : [];
+        const completed = Array.isArray(data.completed) ? data.completed : [];
+        const available = Array.isArray(data.available) ? data.available : [];
+
+        active.forEach(quest => {
+            if (quest?.id) this.activeQuests.set(quest.id, quest);
+        });
+        completed.forEach(quest => {
+            if (quest?.id) this.completedQuests.set(quest.id, quest);
+        });
+        available.forEach(quest => {
+            if (quest?.id) this.availableQuests.set(quest.id, quest);
+        });
+
+        this.updateQuestCounts();
+        this.updateQuestDisplay();
     }
     
     dispose() {

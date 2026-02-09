@@ -13,6 +13,7 @@ export const BUFFS = {
         description: 'Movement speed greatly increased for 15 seconds.',
         duration: 15,
         potency: 1.8, // speed multiplier
+        effects: { speed: 1.6 }
     },
     [BUFF_TYPES.ATTACK_SPEED]: {
         id: BUFF_TYPES.ATTACK_SPEED,
@@ -21,6 +22,7 @@ export const BUFFS = {
         description: 'Attack speed greatly increased for 15 seconds.',
         duration: 15,
         potency: 0.5, // attack cooldown multiplier
+        effects: { attackSpeed: 1.5 }
     },
     [BUFF_TYPES.DAMAGE_SHIELD]: {
         id: BUFF_TYPES.DAMAGE_SHIELD,
