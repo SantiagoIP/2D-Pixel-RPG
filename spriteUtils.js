@@ -1173,6 +1173,10 @@ const spriteData = {
  // Creates a PlaneGeometry with a CanvasTexture for a pixelated sprite look
 export function createPixelSprite(spriteType = 'default', size = 1, canvasResolution) {
     let spriteInfo = spriteData[spriteType];
+    // Resolve string aliases (e.g., rock -> enhancedRock)
+    if (typeof spriteInfo === 'string') {
+        spriteInfo = spriteData[spriteInfo];
+    }
     if (!spriteInfo) {
         console.warn(`[createPixelSprite] Sprite type '${spriteType}' not found. Using default sprite.`);
         spriteInfo = spriteData.default;
@@ -1423,6 +1427,10 @@ export function createAttackSprite(size = 0.5) {
 }
 export function getPixelSpriteTexture(spriteType = 'default', size = 1, canvasResolution) {
     let spriteInfo = spriteData[spriteType];
+    // Resolve string aliases
+    if (typeof spriteInfo === 'string') {
+        spriteInfo = spriteData[spriteInfo];
+    }
     if (!spriteInfo) {
         console.warn(`[getPixelSpriteTexture] Sprite type '${spriteType}' not found. Using default sprite.`);
         spriteInfo = spriteData.default;

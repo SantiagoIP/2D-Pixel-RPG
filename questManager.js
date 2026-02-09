@@ -391,9 +391,12 @@ export class QuestManager {
     }
     
     updateQuestCounts() {
-        document.getElementById('active-quest-count').textContent = this.activeQuests.size;
-        document.getElementById('completed-quest-count').textContent = this.completedQuests.size;
-        document.getElementById('available-quest-count').textContent = this.availableQuests.size;
+        const activeEl = document.getElementById('active-quest-count');
+        const completedEl = document.getElementById('completed-quest-count');
+        const availableEl = document.getElementById('available-quest-count');
+        if (activeEl) activeEl.textContent = this.activeQuests.size;
+        if (completedEl) completedEl.textContent = this.completedQuests.size;
+        if (availableEl) availableEl.textContent = this.availableQuests.size;
     }
     
     updateQuestList(category = 'active') {
@@ -557,6 +560,29 @@ export class QuestManager {
     
     hasQuest(questId) {
         return this.isQuestActive(questId) || this.isQuestCompleted(questId) || this.availableQuests.has(questId);
+    }
+    
+    // Save/Load support
+    getAllQuests() {
+        return {
+            active: Array.from(this.activeQuests.entries()),
+            completed: Array.from(this.completedQuests.entries()),
+            available: Array.from(this.availableQuests.entries())
+        };
+    }
+    
+    loadQuests(questData) {
+        if (!questData) return;
+        if (questData.active) {
+            this.activeQuests = new Map(questData.active);
+        }
+        if (questData.completed) {
+            this.completedQuests = new Map(questData.completed);
+        }
+        if (questData.available) {
+            this.availableQuests = new Map(questData.available);
+        }
+        this.updateQuestCounts();
     }
     
     dispose() {

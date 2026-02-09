@@ -92,7 +92,7 @@ export class Game {
         
         // Initialize RPG systems
         this.npcManager = new NPCManager(this.scene, this.particleSystem);
-        this.dialogueSystem = new DialogueSystem();
+        this.dialogueSystem = new DialogueSystem(this.uiManager);
         this.inventorySystem = new InventorySystem();
         this.questManager = new QuestManager();
         this.craftingSystem = new CraftingSystem();

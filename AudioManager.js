@@ -229,16 +229,28 @@ export class AudioManager {
     }
     // Note to frequency map (simplified)
     getNoteFrequency(note) {
-        const notes = { 'C': 261.63, 'D': 293.66, 'E': 329.63, 'F': 349.23, 'G': 392.00, 'A': 440.00, 'B': 493.88 };
-        const octave = parseInt(note.replace('#', '').slice(-1), 10);
-        const key = note.replace('#', '').slice(0, -1);
-        const baseFreq = notes[key];
+        // Full chromatic note map at octave 4
+        const noteMap = {
+            'C': 261.63, 'C#': 277.18, 'Db': 277.18,
+            'D': 293.66, 'D#': 311.13, 'Eb': 311.13,
+            'E': 329.63, 'Fb': 329.63,
+            'F': 349.23, 'F#': 369.99, 'Gb': 369.99,
+            'G': 392.00, 'G#': 415.30, 'Ab': 415.30,
+            'A': 440.00, 'A#': 466.16, 'Bb': 466.16,
+            'B': 493.88, 'Cb': 493.88
+        };
+        
+        // Parse note name and octave (e.g., "A#4" -> noteName="A#", octave=4)
+        const octaveChar = note.slice(-1);
+        const octave = parseInt(octaveChar, 10);
+        const noteName = note.slice(0, -1);
+        
+        if (isNaN(octave)) return null;
+        
+        const baseFreq = noteMap[noteName];
         if (!baseFreq) return null;
-        let freq = baseFreq * Math.pow(2, octave - 4);
-        if (note.includes('#')) {
-            freq *= Math.pow(2, 1/12); // Go up one semitone for a sharp
-        }
-        return freq;
+        
+        return baseFreq * Math.pow(2, octave - 4);
     }
     createMusicTrack(name, tempo, sequence) {
         this.musicTracks[name] = { tempo, sequence };
