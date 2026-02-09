@@ -13,7 +13,7 @@ export class InputHandler {
         this.keys[event.code] = true;
         
         // Prevent browser default actions for keys we use (Arrow keys only for movement)
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Digit1', 'Digit2', 'Digit3', 'KeyE', 'KeyF', 'KeyI', 'KeyJ', 'KeyC', 'KeyM', 'KeyB', 'KeyP', 'KeyN'].includes(event.code)) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Digit1', 'Digit2', 'Digit3', 'KeyE', 'KeyF', 'KeyI', 'KeyJ', 'KeyC', 'KeyM', 'KeyB', 'KeyP', 'KeyN', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
             event.preventDefault();
         }
     }

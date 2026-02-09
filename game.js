@@ -380,13 +380,22 @@ export class Game {
         }
     }
     spawnRandomEncounter() {
-        // Only spawn encounters occasionally during exploration
-        if (Math.random() < 0.08) { // 8% chance per frame for more encounters
+        // Throttle: only check once per ~2 seconds (not every frame)
+        if (!this._encounterTimer) this._encounterTimer = 0;
+        this._encounterTimer += 1;
+        if (this._encounterTimer < 120) return; // Skip ~2 seconds worth of frames at 60fps
+        this._encounterTimer = 0;
+        
+        // Cap active monsters to prevent overwhelming the player
+        const maxMonsters = 6 + this.getBiomeDifficulty(this.currentBiomeName);
+        if (this.monsters.length >= maxMonsters) return;
+        
+        // Spawn chance based on biome difficulty and player level
+        const spawnChance = 0.3 + this.getBiomeDifficulty(this.currentBiomeName) * 0.1;
+        if (Math.random() < spawnChance) {
             const monsterTypes = this.getBiomeMonsters(this.currentBiomeName);
-            // Difficulty-based monster count: harder biomes get more monsters
             const biomeBase = this.getBiomeDifficulty(this.currentBiomeName);
-            const monsterCount = Math.max(1, biomeBase + Math.floor(Math.random() * (biomeBase + 1)));
-            console.log(`🎯 Random encounter in ${this.currentBiomeName}:`, monsterTypes);
+            const monsterCount = Math.max(1, Math.min(biomeBase, maxMonsters - this.monsters.length));
             this.spawnMonsters(monsterCount, monsterTypes);
         }
     }
@@ -709,6 +718,7 @@ export class Game {
          // Update UI
          this.uiManager.updatePlayerHealth(this.player.currentHealth, this.player.maxHealth);
         this.uiManager.updateMana(this.player.mana, this.player.maxMana);
+        this.uiManager.updateStamina(this.player.stamina, this.player.staminaMax);
         this.uiManager.updateExperience(this.player.level, this.player.experience, this.player.xpToNextLevel);
        this.uiManager.updatePlayerStats({
            maxHealth: this.player.maxHealth,

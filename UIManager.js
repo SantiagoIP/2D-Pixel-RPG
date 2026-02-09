@@ -837,6 +837,21 @@ export class UIManager {
         this.manaBarFill.className = 'mana-bar-fill';
         manaBarBackground.appendChild(this.manaBarFill);
         
+        // Stamina bar
+        this.staminaText = document.createElement('div');
+        this.staminaText.className = 'health-text';
+        this.staminaText.style.color = '#28a745';
+        this.staminaText.textContent = 'SP: ???/???';
+        const staminaBarBackground = document.createElement('div');
+        staminaBarBackground.className = 'bar-background';
+        staminaBarBackground.style.width = '180px';
+        this.staminaBarFill = document.createElement('div');
+        this.staminaBarFill.className = 'health-bar-fill';
+        this.staminaBarFill.style.background = 'linear-gradient(90deg, #28a745, #4caf50, #81c784)';
+        this.staminaBarFill.style.boxShadow = '0 0 12px rgba(40, 167, 69, 0.7)';
+        this.staminaBarFill.style.animation = 'none';
+        staminaBarBackground.appendChild(this.staminaBarFill);
+        
         this.levelDisplay = document.createElement('div');
         this.levelDisplay.className = 'level-text';
         this.levelDisplay.textContent = 'Level: 1';
@@ -845,7 +860,7 @@ export class UIManager {
         this.xpBarFill = document.createElement('div');
         this.xpBarFill.className = 'xp-bar-fill';
         xpBarBackground.appendChild(this.xpBarFill);
-        this.healthDisplayContainer.append(this.healthText, healthBarBackground, this.manaText, manaBarBackground, this.levelDisplay, xpBarBackground);
+        this.healthDisplayContainer.append(this.healthText, healthBarBackground, this.manaText, manaBarBackground, this.staminaText, staminaBarBackground, this.levelDisplay, xpBarBackground);
         // --- Stats Display (below health) ---
         this.statsDisplay = document.createElement('div');
         this.statsDisplay.className = 'stats-display hud-container';
@@ -1012,6 +1027,13 @@ export class UIManager {
             const manaPercentage = (currentMana / maxMana) * 100;
             this.manaBarFill.style.width = `${manaPercentage}%`;
             this.manaText.innerHTML = `<span class='pixel-star'>✦</span> ${Math.floor(currentMana)} / ${maxMana}`;
+        }
+    }
+    updateStamina(currentStamina, maxStamina) {
+        if (this.staminaBarFill && this.staminaText) {
+            const staminaPercentage = (currentStamina / maxStamina) * 100;
+            this.staminaBarFill.style.width = `${staminaPercentage}%`;
+            this.staminaText.innerHTML = `<span style="color:#28a745;">⚡</span> ${Math.floor(currentStamina)} / ${maxStamina}`;
         }
     }
     updateExperience(level, currentXP, xpToNextLevel) {
