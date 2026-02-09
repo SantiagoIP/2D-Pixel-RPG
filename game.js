@@ -513,6 +513,9 @@ export class Game {
         // Update UI with current biome
         this.uiManager.updateBiome(this.currentBiomeName.replace(/_/g, ' '));
         
+        // Set biome-specific music
+        this.audioManager.setBiome(this.currentBiomeName);
+        
         // Audio will start automatically after user interaction
         console.log("🎵 Game started - audio will begin automatically on user interaction");
         console.log("🎮 Pixel Scrolls ready for exploration - Player health:", this.player.currentHealth, "/", this.player.maxHealth);
@@ -557,7 +560,9 @@ export class Game {
             if (attackHit) {
                 this.projectiles.push(attackHit);
                 this.scene.add(attackHit.mesh);
-                this.audioManager.playSound('playerAttack'); // Play attack sound
+                // Play weapon-specific attack sound
+                const weaponSounds = { 'sword': 'playerAttack', 'bow': 'playerAttack_bow', 'staff': 'playerAttack_staff' };
+                this.audioManager.playSound(weaponSounds[this.player.currentWeapon] || 'playerAttack');
             }
         }
 
@@ -1221,8 +1226,9 @@ export class Game {
             this.player.mesh.position.set(0, this.player.size / 2, -25);
         }
         
-        // Update UI
+        // Update UI and music
         this.uiManager.updateBiome(region);
+        this.audioManager.setBiome(region);
         console.log("Successfully traveled to:", region);
     }
     
