@@ -533,6 +533,46 @@
       background: var(--accent-tertiary);
       color: var(--primary-bg);
     }
+
+    /* Quick Controls Strip */
+    .controls {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 8px;
+      border: 2px solid var(--border-accent);
+      font-family: 'Cinzel', serif;
+      color: var(--text-primary);
+      text-shadow: 2px 2px 4px var(--shadow-primary);
+      box-shadow: 0 0 20px var(--shadow-secondary);
+      z-index: 1000;
+      font-size: 12px;
+    }
+
+    .controls h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: var(--accent-primary);
+    }
+
+    .controls div {
+      margin: 5px 0;
+    }
+
+    .key {
+      display: inline-block;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border-accent);
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-right: 8px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 9px;
+      color: var(--text-secondary);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -555,6 +595,10 @@
           <div class="control-item">
             <span class="key-combo">SHIFT</span>
             <span class="action-desc">Dodge Roll</span>
+          </div>
+          <div class="control-item">
+            <span class="key-combo">Q</span>
+            <span class="action-desc">Block (Hold)</span>
           </div>
           <div class="control-item">
             <span class="key-combo">1/2/3</span>
@@ -633,6 +677,10 @@
             <span class="action-desc">Switch Weapons</span>
           </div>
           <div class="control-item">
+            <span class="key-combo">Q</span>
+            <span class="action-desc">Block (Hold)</span>
+          </div>
+          <div class="control-item">
             <span class="key-combo">E</span>
             <span class="action-desc">Interact (NPCs, Buildings)</span>
           </div>
@@ -695,6 +743,7 @@
     <div><span class="key">SHIFT</span> Dodge</div>
     <div><span class="key">E</span> Interact</div>
     <div><span class="key">SPACE</span> Attack</div>
+    <div><span class="key">Q</span> Block</div>
     <div><span class="key">I</span> Inventory</div>
     <div><span class="key">J</span> Quests</div>
     <div><span class="key">H</span> Help</div>

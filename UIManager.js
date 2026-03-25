@@ -1846,9 +1846,8 @@ export class UIManager {
     }
 
     showShop(shopData, merchantName) {
-        // Sync playerGold with game score/gold
-        if (window.game) {
-            this.playerGold = window.game.score;
+        if (window.game && window.game.inventorySystem) {
+            this.playerGold = window.game.inventorySystem.gold;
         }
         
         // Create shop overlay
@@ -1978,14 +1977,13 @@ export class UIManager {
             return;
         }
 
-        // Deduct gold
-        this.playerGold = (this.playerGold || 0) - item.price;
-        
-        // Sync back to game score
-        if (window.game) {
-            window.game.score = this.playerGold;
+        if (window.game && window.game.inventorySystem) {
+            window.game.inventorySystem.spendGold(item.price);
+            this.playerGold = window.game.inventorySystem.gold;
+        } else {
+            this.playerGold = (this.playerGold || 0) - item.price;
         }
-        
+
         this.updateGold(this.playerGold);
 
         // Add item to inventory

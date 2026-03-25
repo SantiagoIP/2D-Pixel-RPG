@@ -300,15 +300,16 @@ export class QuestManager {
 
     distributeQuestRewards(quest) {
         if (!quest.rewards) return;
-        
+
         const rewards = quest.rewards;
-        
-        // Give gold
-        if (rewards.gold && window.game) {
-            window.game.score += rewards.gold;
-            window.game.uiManager.playerGold = window.game.score;
-            window.game.uiManager.updateGold(window.game.score);
-            console.log(`Quest reward: +${rewards.gold} gold`);
+
+        if (rewards.gold && window.game && window.game.inventorySystem) {
+            window.game.inventorySystem.addGold(rewards.gold);
+            window.game.uiManager.updateGold(window.game.inventorySystem.gold);
+        }
+
+        if (window.game && window.game.audioManager) {
+            window.game.audioManager.playSound('questComplete');
         }
         
         // Give experience

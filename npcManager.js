@@ -300,7 +300,7 @@ export class NPCManager {
                             title: 'Herbalist\'s Request',
                             description: 'Collect healing herbs from around the village for Trader Emma.',
                             objectives: [
-                                { id: 'collect_herbs', description: 'Collect 5 healing herbs', completed: false, type: 'gather_resources', target: 'Healing Herb', current: 0, required: 5 }
+                                { id: 'collect_herbs', description: 'Collect 5 healing herbs', completed: false, current: 0, target: 5 }
                             ],
                             rewards: {
                                 gold: 15,

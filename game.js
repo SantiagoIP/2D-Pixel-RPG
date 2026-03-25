@@ -13,13 +13,15 @@ import { DialogueSystem } from './dialogueSystem.js';
 import { QuestManager } from './questManager.js';
 import { InventorySystem } from './inventorySystem.js';
 import { CraftingSystem } from './craftingSystem.js';
-import { CharacterProgressionSystem } from './characterProgression.js';
 import { PerformanceOptimizer } from './performanceOptimizer.js';
 
 const RENDER_SCALE = 0.75; // Render at lower res for performance/style
 const PLAYER_INVULNERABILITY_DURATION = 1.0; // Seconds of invulnerability after taking damage
 
 export class Game {
+    get score() { return this.inventorySystem ? this.inventorySystem.gold : 0; }
+    set score(v) { if (this.inventorySystem) this.inventorySystem.gold = v; }
+
     constructor(renderDiv) {
         this.renderDiv = renderDiv;
         this.renderer = new THREE.WebGLRenderer({ 
@@ -48,7 +50,7 @@ export class Game {
         this.isGameOver = false; // Game state flag
         this.isStarted = false; // Has the game started from the intro screen?
         this.isPaused = false; // Pause state for menus
-        this.score = 0; // Initialize score (now used for gold/currency)
+        
         this.gameMode = 'exploration'; // 'exploration' or 'arena' (for optional combat areas)
         this.currentBiomeName = 'GREEN_HILLS'; // Default start biome
         this.explorationMode = true; // New flag to disable wave-based progression
@@ -96,7 +98,6 @@ export class Game {
         this.inventorySystem = new InventorySystem();
         this.questManager = new QuestManager();
         this.craftingSystem = new CraftingSystem();
-        this.progressionSystem = new CharacterProgressionSystem();
         this.performanceOptimizer = new PerformanceOptimizer(this);
         
         // Add starting items and equipment for testing
@@ -106,9 +107,7 @@ export class Game {
         this.inventorySystem.addItem({ name: 'Wood', quantity: 8, type: 'material' });
         this.inventorySystem.addItem({ name: 'Leather', quantity: 3, type: 'material' });
         
-        // Initialize with score as gold
-        this.uiManager.updateGold(this.score);
-        this.uiManager.playerGold = this.score; // Sync playerGold with score
+        this.uiManager.updateGold(this.inventorySystem.gold);
 
         // Connect global game reference for shop system
         window.game = this;
@@ -268,7 +267,7 @@ export class Game {
                 const helpOverlay = document.getElementById('help-overlay');
                 if (helpOverlay) {
                     const isVisible = helpOverlay.style.display !== 'none';
-                    helpOverlay.style.display = isVisible ? 'none' : 'block';
+                    helpOverlay.style.display = isVisible ? 'none' : 'flex';
                     console.log(`Help overlay ${isVisible ? 'hidden' : 'shown'}`);
                 } else {
                     console.warn('❌ Help overlay not found');
@@ -575,6 +574,9 @@ export class Game {
             }
         }
 
+        // Blocking stance (hold Q)
+        this.player.isBlocking = !!this.inputHandler.keys['KeyQ'];
+
         // Weapon switching
         if (this.inputHandler.keys['Digit1']) {
             this.inputHandler.keys['Digit1'] = false;
@@ -646,13 +648,12 @@ export class Game {
                     if (!monster.isAlive()) {
                         const goldReward = 10 + Math.floor(Math.random() * 5);
                         const xpReward = 10 + Math.floor(Math.random() * 5);
-                        this.score += goldReward;
+                        this.inventorySystem.addGold(goldReward);
                         const leveledUp = this.player.addExperience(xpReward);
                         if (leveledUp) {
                             this.handleLevelUp();
                         }
-                        this.uiManager.playerGold = this.score;
-                        this.uiManager.updateScore(this.score);
+                        this.uiManager.updateGold(this.inventorySystem.gold);
                         
                         // Show rewards
                         this.uiManager.showDamageNumber(goldReward, monster.mesh.position, 'gold');
@@ -709,6 +710,11 @@ export class Game {
          
          // Check shrine interaction
          this.checkShrineInteraction();
+
+         // Check for herb/collectible pickups
+         if (this.playerLocation === 'overworld') {
+             this.player.checkForCollectibles(this.world, this.questManager, this.inventorySystem);
+         }
          
          // Check for resource gathering
          this.checkResourceGathering();
@@ -812,12 +818,13 @@ export class Game {
             const collisionThreshold = Math.pow((this.player.size + monster.size) / 2, 2);
             if (distanceSquared < collisionThreshold) {
                 if (!this.player.isInvulnerable) {
-                    this.player.takeDamage(1);
+                    const contactDamage = monster.attackDamage || 1;
+                    this.player.takeDamage(contactDamage);
                     this.audioManager.playSound('playerHit');
-                    this.uiManager.showDamageNumber(1, this.player.mesh.position, 'damage');
-                    this.uiManager.showCombatMessage(`${monster.type} hit you for 1 damage!`, '#ff4444');
+                    this.uiManager.showDamageNumber(contactDamage, this.player.mesh.position, 'damage');
+                    this.uiManager.showCombatMessage(`${monster.type} hit you for ${contactDamage} damage!`, '#ff4444');
                     const pushDirection = this.player.mesh.position.clone().sub(monster.mesh.position).normalize();
-                    this.player.mesh.position.add(pushDirection.multiplyScalar(0.2)); // Stronger push
+                    this.player.mesh.position.add(pushDirection.multiplyScalar(0.2));
                     // Check for game over
                     if (!this.player.isAlive()) {
                         this.gameOver();
@@ -833,9 +840,10 @@ export class Game {
             const collisionThreshold = Math.pow((this.player.size + proj.size) / 2, 2);
             if (distanceSquared < collisionThreshold) {
                  if (!this.player.isInvulnerable) {
-                    this.player.takeDamage(1);
+                    const projDamage = proj.damage || 1;
+                    this.player.takeDamage(projDamage);
                     this.audioManager.playSound('playerHit');
-                    this.uiManager.showDamageNumber(1, this.player.mesh.position, 'damage');
+                    this.uiManager.showDamageNumber(projDamage, this.player.mesh.position, 'damage');
                     proj.expire();
                     const pushDirection = this.player.mesh.position.clone().sub(proj.mesh.position).normalize();
                     this.player.mesh.position.add(pushDirection.multiplyScalar(0.1));
@@ -1108,7 +1116,7 @@ export class Game {
                 },
                 inventory: this.inventorySystem.getAllItems(),
                 quests: this.questManager.getAllQuests(),
-                score: this.score,
+                gold: this.inventorySystem.gold,
                 playtime: Date.now() - (this.gameStartTime || Date.now())
             };
 
@@ -1171,9 +1179,9 @@ export class Game {
                 this.questManager.loadQuests(gameState.quests);
             }
 
-            // Restore score
-            this.score = gameState.score || 0;
-            this.uiManager.updateGold(this.score);
+            // Restore gold (supports both old 'score' saves and new 'gold' saves)
+            this.inventorySystem.gold = gameState.gold ?? gameState.score ?? 0;
+            this.uiManager.updateGold(this.inventorySystem.gold);
 
             this.uiManager.showNotification('Game Loaded Successfully!', 'success');
             console.log('Game loaded successfully');
@@ -1336,70 +1344,59 @@ export class Game {
     }
     
     handleQuestInteraction(npc) {
-        console.log(`Talking to ${npc.name} for quest interaction`);
-        
         if (npc.quests && npc.quests.length > 0) {
             npc.quests.forEach(quest => {
                 if (!this.questManager.hasQuest(quest.id)) {
-                    console.log(`Starting quest: ${quest.title}`);
                     this.questManager.addAvailableQuest(quest);
                     this.questManager.startQuest(quest.id);
-                    
-                    // Add equipment rewards to some quests
+
                     if (quest.id === 'welcome_quest') {
-                        // Give starting equipment
-                        this.inventorySystem.addItem('iron_sword', 1, {
+                        this.inventorySystem.addItem({
+                            id: 'iron_sword',
+                            name: 'Iron Sword',
                             type: 'weapon',
                             stats: { attack: 3 },
                             description: 'A sturdy iron sword',
                             rarity: 'common'
                         });
-                        console.log('Received Iron Sword as quest reward!');
                     }
                 }
             });
         }
-        
-        // Check for quest completion
+
         const activeQuests = this.questManager.getActiveQuests();
         activeQuests.forEach(quest => {
             quest.objectives.forEach(objective => {
                 if (objective.type === 'talk_to_npc' && objective.target === npc.name && !objective.completed) {
                     objective.completed = true;
-                    console.log(`Quest objective completed: Talk to ${npc.name}`);
-                    
-                    // Check if quest is complete
+
                     if (quest.objectives.every(obj => obj.completed)) {
                         this.questManager.completeQuest(quest.id);
-                        this.score += quest.reward || 10;
-                        this.uiManager.playerGold = this.score; // Sync playerGold with score
-                        this.uiManager.updateGold(this.score);
-                        
-                        // Equipment quest rewards
-                        if (quest.id === 'herbalist_request') {
-                            this.inventorySystem.addItem('leather_armor', 1, {
+                        this.uiManager.updateGold(this.inventorySystem.gold);
+
+                        if (quest.id === 'gather_herbs') {
+                            this.inventorySystem.addItem({
+                                id: 'leather_armor',
+                                name: 'Leather Armor',
                                 type: 'armor',
                                 stats: { defense: 2, health: 5 },
                                 description: 'Basic leather armor',
                                 rarity: 'common'
                             });
-                            console.log('Received Leather Armor as quest reward!');
                         }
                     }
                 }
             });
         });
     }
-    
+
     handleMonsterKillQuests(monster) {
-        // Check if killing this monster advances any quest objectives
         const activeQuests = this.questManager.getActiveQuests();
-        
+
         for (const quest of activeQuests) {
             for (const objective of quest.objectives) {
-                if (!objective.completed && objective.id === 'kill_monsters') {
-                    console.log('✅ Monster killed for quest progress');
-                    this.questManager.updateQuestObjective(quest.id, 'kill_monsters');
+                if (!objective.completed && (objective.id === 'kill_monsters' || objective.type === 'kill_monster')) {
+                    this.questManager.updateQuestObjective(quest.id, objective.id);
                 }
             }
         }
@@ -1416,7 +1413,7 @@ export class Game {
                 maxHealth: this.player.maxHealth + (totalStats.maxHealth || 0),
                 attack: this.player.attackDamage + (totalStats.attack || 0),
                 defense: (totalStats.defense || 0),
-                gold: this.score
+                gold: this.inventorySystem.gold
             });
             
             // Apply equipment bonuses to player
@@ -1486,13 +1483,9 @@ export class Game {
                                     this.uiManager.hideInteractionPrompt();
                                 }, 2000);
                                 
-                                // Check if entire quest is complete
                                 if (quest.objectives.every(obj => obj.completed)) {
                                     this.questManager.completeQuest(quest.id);
-                                            this.score += quest.rewards.gold || 0;
-        this.uiManager.playerGold = this.score; // Sync playerGold with score
-        this.uiManager.updateGold(this.score);
-                                    console.log(`🎉 Quest completed: ${quest.title}`);
+                                    this.uiManager.updateGold(this.inventorySystem.gold);
                                 }
                             }
                         }

@@ -311,6 +311,16 @@ export class ParticleSystem {
         }
     }
 
+    emit(type, origin, config) {
+        const count = config.count || 1;
+        for (let i = 0; i < count; i++) {
+            if (this.activeParticles.length >= this.maxParticles) break;
+            const particle = this.particlePool.length > 0 ? this.particlePool.pop() : new Particle();
+            particle.reset(origin, config);
+            this.activeParticles.push(particle);
+        }
+    }
+
     update(deltaTime) {
         // Update time uniform for shader effects
         this.material.uniforms.time.value += deltaTime;

@@ -61,26 +61,18 @@ export class PerformanceOptimizer {
     
     optimizeRenderer() {
         const renderer = this.game.renderer;
-        
-        // Enable frustum culling
+
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        
-        // Optimize shadow settings
+
         if (this.settings.shadowQuality === 'low') {
             renderer.shadowMap.enabled = false;
         } else {
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = this.settings.shadowQuality === 'high' ? 
+            renderer.shadowMap.type = this.settings.shadowQuality === 'high' ?
                 THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
         }
-        
-        // Set appropriate render size
-        const renderScale = this.settings.textureQuality === 'high' ? 1.0 : 
-                           this.settings.textureQuality === 'medium' ? 0.75 : 0.5;
-        
-        const width = Math.floor(window.innerWidth * renderScale);
-        const height = Math.floor(window.innerHeight * renderScale);
-        renderer.setSize(width, height);
+
+        // Defer render size to the game's own onWindowResize; don't override here
     }
     
     initializeObjectPools() {

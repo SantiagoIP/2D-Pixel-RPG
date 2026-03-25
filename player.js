@@ -340,20 +340,15 @@ export class Player {
     attack() {
         const now = performance.now() / 1000;
         if (now - this.lastAttackTime < this.attackCooldown || this.isAttacking) {
-            return null; // Attack on cooldown or already attacking
+            return null;
         }
-        
-        this.lastAttackTime = now;
-        this.isAttacking = true;
-        this.attackAnimationTime = 0;
-        
-        // Determine attack type based on weapon
+
         let attackType = 'melee';
-        let baseDamage = this.attackDamage + (this.equipmentAttackBonus || 0); // Include equipment bonus
+        let baseDamage = this.attackDamage + (this.equipmentAttackBonus || 0);
         let damage = baseDamage;
         let size = this.attackSize;
         let lifetime = this.attackLifetime;
-        
+
         switch (this.currentWeapon) {
             case 'bow':
                 attackType = 'ranged';
@@ -363,28 +358,28 @@ export class Player {
                 break;
             case 'staff':
                 attackType = 'magic';
-                // Check if player has enough mana for magic attack
                 if (this.mana < this.spellCosts.magic) {
-                    console.log('Not enough mana for magic attack!');
-                    // Show mana notification if UIManager is available
                     if (window.game && window.game.uiManager) {
                         window.game.uiManager.showNotification('Not enough mana!', 'error');
                     }
-                    return; // Cancel the attack
+                    return null;
                 }
-                // Consume mana for magic attack
                 this.mana -= this.spellCosts.magic;
                 damage = baseDamage * 2;
                 size = this.attackSize * 1.2;
                 lifetime = this.attackLifetime * 1.5;
                 break;
-            default: // sword
+            default:
                 attackType = 'melee';
                 damage = baseDamage;
                 size = this.attackSize;
                 lifetime = this.attackLifetime;
                 break;
         }
+
+        this.lastAttackTime = now;
+        this.isAttacking = true;
+        this.attackAnimationTime = 0;
         
         // Critical hit calculation
         const isCritical = Math.random() < this.criticalChance;
@@ -646,6 +641,9 @@ export class Player {
                         inventorySystem.addItem({ name: 'Healing Herb', quantity: 1, type: 'herb' });
                     }
                     this.particleSystem.createEffect('pickup', collectible.position);
+                    if (window.game && window.game.audioManager) {
+                        window.game.audioManager.playSound('itemPickup');
+                    }
                     collectiblesToRemove.push(i);
                     world.overworldContainer.remove(collectible);
                 }

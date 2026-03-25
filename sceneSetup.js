@@ -3,12 +3,8 @@ import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 export function setupScene() {
     const scene = new THREE.Scene();
     
-    // Set a simple color background first for debugging
-    scene.background = new THREE.Color(0x87CEEB);
-    
-    // Create an enhanced gradient sky background with dynamic time effects
-    // const skyGradient = createEnhancedSkyGradient();
-    // scene.background = skyGradient;
+    const skyGradient = createEnhancedSkyGradient();
+    scene.background = skyGradient;
 
     // Use Orthographic Camera for 2D feel with better positioning
     const aspect = window.innerWidth / window.innerHeight;
